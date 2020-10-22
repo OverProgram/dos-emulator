@@ -1,3 +1,5 @@
+mod cpu;
+
 #[cfg(test)]
 mod tests {
     #[test]
