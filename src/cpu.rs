@@ -37,16 +37,18 @@ struct Opcode {
     instruction: Rc<dyn Fn(&mut CPU) -> usize>,
     num_args: NumArgs,
     cycles: usize,
-    shorthand: Option<(Arg, Option<Arg>)>
+    shorthand: Option<(Arg, Option<Arg>)>,
+    immediate: bool
 }
 
 impl Opcode {
-    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, num_args: NumArgs, cycles: usize, shorthand: Option<(Arg, Option<Arg>)>) -> Self {
+    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, num_args: NumArgs, cycles: usize, shorthand: Option<(Arg, Option<Arg>)>, immediate: bool) -> Self {
         Self {
             instruction,
             num_args,
             cycles,
-            shorthand
+            shorthand,
+            immediate
         }
     }
 }
@@ -85,13 +87,13 @@ impl CPU {
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
         // Move opcodes
-        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov_reg), Two, 1, None));
-        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov_ax), One, 1, None));
+        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov_reg), Two, 1, None, false));
+        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov_ax), One, 1, None, false));
         for x in 0..7 {
-            opcodes.insert(0xB0, Opcode::new(Rc::new(Self::mov_reg), Two, 1, Some((Reg8(Self::translate_reg16(x).unwrap()), None))));
-            opcodes.insert(0xB8, Opcode::new(Rc::new(Self::mov_reg), Two, 1, Some((Reg16(Self::translate_reg16(x).unwrap()), None))));
+            opcodes.insert(0xB0, Opcode::new(Rc::new(Self::mov_reg), Two, 1, Some((Reg8(Self::translate_reg16(x).unwrap()), None)), false));
+            opcodes.insert(0xB8, Opcode::new(Rc::new(Self::mov_reg), Two, 1, Some((Reg16(Self::translate_reg16(x).unwrap()), None)), false));
         }
-        opcodes.insert(0xC8, Opcode::new(Rc::new(Self::mov_imm), Two, 1, None));
+        opcodes.insert(0xC8, Opcode::new(Rc::new(Self::mov_imm), Two, 1, None, true));
 
         Self {
             ram,
@@ -117,6 +119,7 @@ impl CPU {
             let code = code & 0xFC;
             let opcode = self.opcodes.get(&code).unwrap();
             self.next_cycles += opcode.cycles;
+            let immediate = opcode.immediate;
 
             match opcode.num_args {
                 NumArgs::Two => {
@@ -126,9 +129,21 @@ impl CPU {
                         let reg     = (mod_reg_rm & 0x38) >> 3;
                         let mod_bits= (mod_reg_rm & 0xC0) >> 6;
                         let arg1 = Some(Self::reg_to_arg(reg, s));
-                        let arg2 = self.translate_mod_rm(mod_bits, rm, s);
+                        let arg2 = {
+                            if immediate {
+                                Some(
+                                    if s == 1 {
+                                        Arg::Imm16((self.read_ip() as u16) & ((self.read_ip() as u16) << 8))
+                                    } else {
+                                        Arg::Imm8(self.read_ip())
+                                    }
+                                )
+                            } else {
+                                self.translate_mod_rm(mod_bits, rm, s)
+                            }
+                        };
 
-                        if d == 1 {
+                        if d == 1 && !immediate {
                             self.src = arg1;
                             self.dst = arg2;
                         } else {
@@ -201,7 +216,7 @@ impl CPU {
     }
 
     fn read_mem(&self, loc: usize) -> u8 {
-
+        self.ram[loc]
     }
 
     fn load(&mut self, data: Vec<u8>, loc: usize) {
