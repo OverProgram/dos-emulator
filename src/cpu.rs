@@ -200,12 +200,19 @@ impl CPU {
         }
     }
 
-    fn execute_at(&mut self, instruction: Vec<u8>, loc: usize, cycles: u8) {
-        for i in 0..instruction.len() {
-            self.ram[loc + i] = instruction[i];
+    fn read_mem(&self, loc: usize) -> u8 {
+
+    }
+
+    fn load(&mut self, data: Vec<u8>, loc: usize) {
+        for i in 0..data.len() {
+            self.ram[loc + i] = data[i];
         }
         self.regs.get_mut("ip").unwrap().value = (loc as u16);
-        for _ in 0..cycles {
+    }
+
+    fn execute_next(&mut self) {
+        while { match self.instruction { Some(_) => true, None => false } } {
             self.step();
         }
     }
