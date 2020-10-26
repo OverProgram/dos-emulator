@@ -1,5 +1,5 @@
 pub struct Reg {
-    value: u16
+    pub value: u16
 }
 
 impl Reg {
