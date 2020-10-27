@@ -40,6 +40,34 @@ pub enum AddressingMode {
     SIB
 }
 
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+pub enum Regs {
+    AX,
+    BX,
+    CX,
+    DX,
+    SI,
+    DI,
+    SP,
+    BP,
+    ES,
+    CS,
+    SS,
+    DS,
+    IP
+}
+
+pub enum Regs8 {
+    AH,
+    BH,
+    CH,
+    DH,
+    AL,
+    BL,
+    CL,
+    DL
+}
+
 #[derive(Clone)]
 struct Opcode {
     instruction: Rc<dyn Fn(&mut CPU) -> usize>,
@@ -63,7 +91,7 @@ impl Opcode {
 
 pub struct CPU {
     ram: Vec<u8>,
-    regs: HashMap<String, reg::Reg>,
+    regs: HashMap<Regs, reg::Reg>,
     opcodes: HashMap<u8, Opcode>,
     instruction: Option<Opcode>,
     src: Option<Arg>,
@@ -77,20 +105,20 @@ impl CPU {
         let ram: Vec<u8> = vec![0; ram_size];
 
         // Create register HashMap
-        let mut regs: HashMap<String, reg::Reg> = HashMap::new();
-        regs.insert(String::from("ax"), reg::Reg::new());
-        regs.insert(String::from("bx"), reg::Reg::new());
-        regs.insert(String::from("cx"), reg::Reg::new());
-        regs.insert(String::from("dx"), reg::Reg::new());
-        regs.insert(String::from("si"), reg::Reg::new());
-        regs.insert(String::from("di"), reg::Reg::new());
-        regs.insert(String::from("bp"), reg::Reg::new());
-        regs.insert(String::from("sp"), reg::Reg::new());
-        regs.insert(String::from("es"), reg::Reg::new());
-        regs.insert(String::from("ds"), reg::Reg::new());
-        regs.insert(String::from("ss"), reg::Reg::new());
-        regs.insert(String::from("cs"), reg::Reg::new());
-        regs.insert(String::from("ip"), reg::Reg::new());
+        let mut regs: HashMap<Regs, reg::Reg> = HashMap::new();
+        regs.insert(Regs::AX, reg::Reg::new());
+        regs.insert(Regs::BX, reg::Reg::new());
+        regs.insert(Regs::CX, reg::Reg::new());
+        regs.insert(Regs::DX, reg::Reg::new());
+        regs.insert(Regs::SI, reg::Reg::new());
+        regs.insert(Regs::DI, reg::Reg::new());
+        regs.insert(Regs::BP, reg::Reg::new());
+        regs.insert(Regs::SP, reg::Reg::new());
+        regs.insert(Regs::ES, reg::Reg::new());
+        regs.insert(Regs::DS, reg::Reg::new());
+        regs.insert(Regs::SS, reg::Reg::new());
+        regs.insert(Regs::CS, reg::Reg::new());
+        regs.insert(Regs::IP, reg::Reg::new());
 
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
@@ -204,8 +232,8 @@ impl CPU {
     }
 
     fn read_ip(&mut self) -> u8 {
-        let val = self.ram[self.regs.get("ip").unwrap().value as usize];
-        self.regs.get_mut("ip").unwrap().value += 1;
+        let val = self.ram[self.regs.get(&Regs::IP).unwrap().value as usize];
+        self.regs.get_mut(&Regs::IP).unwrap().value += 1;
         self.next_cycles += 1;
         val
     }
@@ -219,9 +247,9 @@ impl CPU {
             Some(Arg::Ptr(self.read_ip_word()))
         } else {
             match mod_bits {
-                0 => Some(Arg::Ptr(self.regs.get(Self::translate_reg16(rm).unwrap().as_str()).unwrap().value)),
-                1 => Some(Arg::Ptr(self.regs.get(Self::translate_reg16(rm).unwrap().as_str()).unwrap().value + (self.read_ip() as u16))),
-                2 => Some(Arg::Ptr(self.regs.get(Self::translate_reg16(rm).unwrap().as_str()).unwrap().value + (self.read_ip_word()))),
+                0 => Some(Arg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value)),
+                1 => Some(Arg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip() as u16))),
+                2 => Some(Arg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip_word()))),
                 3 => Some(Self::reg_to_arg(rm, s)),
                 _ => None
             }
@@ -251,22 +279,22 @@ impl CPU {
     }
 
     fn get_reg_high(&self, num: u8) -> u8 {
-        let reg = self.regs.get(Self::translate_reg16(num % 4).unwrap().as_str()).unwrap();
+        let reg = self.regs.get(&Self::translate_reg16(num % 4).unwrap()).unwrap();
         reg.get_high()
     }
 
     fn get_reg_low(&self, num: u8) -> u8 {
-        let reg = self.regs.get(Self::translate_reg16(num % 4).unwrap().as_str()).unwrap();
+        let reg = self.regs.get(&Self::translate_reg16(num % 4).unwrap()).unwrap();
         reg.get_low()
     }
 
     fn set_reg_high(&mut self, num: u8, val: u8) {
-        let reg = self.regs.get_mut(Self::translate_reg16(num % 4).unwrap().as_str()).unwrap();
+        let reg = self.regs.get_mut(&Self::translate_reg16(num % 4).unwrap()).unwrap();
         reg.set_high(val);
     }
 
     fn set_reg_low(&mut self, num: u8, val: u8) {
-        let reg = self.regs.get_mut(Self::translate_reg16(num % 4).unwrap().as_str()).unwrap();
+        let reg = self.regs.get_mut(&Self::translate_reg16(num % 4).unwrap()).unwrap();
         reg.set_low(val);
     }
 
@@ -278,7 +306,7 @@ impl CPU {
         }
     }
 
-    pub fn read_reg(&self, reg: String) -> Option<u16> {
+    pub fn read_reg(&self, reg: Regs) -> Option<u16> {
         match self.regs.get(&reg) {
             Some(val) => Some(val.value),
             None => None
@@ -293,7 +321,7 @@ impl CPU {
         for i in 0..data.len() {
             self.ram[loc + i] = data[i];
         }
-        self.regs.get_mut("ip").unwrap().value = loc as u16;
+        self.regs.get_mut(&Regs::IP).unwrap().value = loc as u16;
     }
 
     pub fn execute_next(&mut self) {
@@ -304,35 +332,25 @@ impl CPU {
     }
 
     pub fn execute_next_from(&mut self, loc: u16) {
-        self.regs.get_mut("ip").unwrap().value = loc;
+        self.regs.get_mut(&Regs::IP).unwrap().value = loc;
         self.execute_next();
     }
 
-    fn translate_reg16(num: u8) -> Option<String> {
+    fn translate_reg16(num: u8) -> Option<Regs> {
         match num {
-            0 => Some(String::from("ax")),
-            1 => Some(String::from("cx")),
-            2 => Some(String::from("dx")),
-            3 => Some(String::from("bx")),
-            4 => Some(String::from("sp")),
-            5 => Some(String::from("bp")),
-            6 => Some(String::from("si")),
-            7 => Some(String::from("di")),
+            0 => Some(Regs::AX),
+            1 => Some(Regs::CX),
+            2 => Some(Regs::DX),
+            3 => Some(Regs::BX),
+            4 => Some(Regs::SP),
+            5 => Some(Regs::BP),
+            6 => Some(Regs::SI),
+            7 => Some(Regs::DI),
             _ => None
         }
     }
 
-    fn translate_reg8(num: u8) -> Option<String> {
-        match num {
-            0 => Some(String::from("al")),
-            1 => Some(String::from("cl")),
-            2 => Some(String::from("dl")),
-            3 => Some(String::from("bl")),
-            4 => Some(String::from("ah")),
-            5 => Some(String::from("ch")),
-            6 => Some(String::from("dh")),
-            7 => Some(String::from("bh")),
-            _ => None
-        }
+    fn translate_reg8(num: u8) -> Option<Regs> {
+        Self::translate_reg16(num % 4)
     }
 }

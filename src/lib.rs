@@ -10,7 +10,7 @@ mod tests {
         let mut computer = cpu::CPU::new(code.len());
         computer.load(code, 0);
         computer.execute_next();
-        assert_eq!(computer.read_reg(String::from("ax")).unwrap(), 6);
+        assert_eq!(computer.read_reg(cpu::Regs::AX).unwrap(), 6);
     }
 
     #[test]

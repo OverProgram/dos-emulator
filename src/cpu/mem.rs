@@ -32,8 +32,7 @@ impl CPU {
 
         match self.src.clone().unwrap() {
             Arg::Reg8(reg) => {
-                let reg_name = Self::translate_reg8(reg).unwrap();
-                if reg_name.chars().nth(1).unwrap() == 'h' {
+                if reg > 4 {
                     val = self.get_reg_high(reg) as u16;
                 } else {
                     val = self.get_reg_low(reg) as u16;
@@ -77,8 +76,7 @@ impl CPU {
                 0
             }
             Arg::Reg8(reg) => {
-                let reg_name = Self::translate_reg8(reg).unwrap();
-                if reg_name.chars().nth(1).unwrap() == 'h' {
+                if reg > 4 {
                     self.set_reg_high(reg, val as u8);
                 } else {
                     self.set_reg_low(reg, val as u8);
