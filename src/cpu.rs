@@ -5,14 +5,14 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::option::Option::Some;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum NumArgs {
     Zero,
     One,
     Two
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Arg {
     Reg8(u8),
     Reg16(u8),
@@ -21,15 +21,16 @@ enum Arg {
     Ptr(u16)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Placeholder {
     Reg8(u8),
     Reg16(u8),
     Reg(u8),
+    Imm,
     Ptr
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum AddressingMode {
     Immediate,
     Direct,
@@ -60,7 +61,7 @@ impl Opcode {
     }
 }
 
-struct CPU {
+pub struct CPU {
     ram: Vec<u8>,
     regs: HashMap<String, reg::Reg>,
     opcodes: HashMap<u8, Opcode>,
@@ -73,7 +74,7 @@ struct CPU {
 impl CPU {
     pub fn new(ram_size: usize) -> Self {
         // Create and allocate the virtual ram
-        let ram: Vec<u8> = Vec::with_capacity(ram_size);
+        let ram: Vec<u8> = vec![0; ram_size];
 
         // Create register HashMap
         let mut regs: HashMap<String, reg::Reg> = HashMap::new();
@@ -96,12 +97,12 @@ impl CPU {
         // Move opcodes
         opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov_reg), NumArgs::Two, 1, None, false));
         // opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov_ax), One, 1, None, false));
-        opcodes.insert(0xB8, Opcode::new(Rc::new(Self::mov_reg), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), false));
+        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov_reg), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), false));
         for x in 0..7 {
-            opcodes.insert(0xB0, Opcode::new(Rc::new(Self::mov_reg), NumArgs::Two, 1, Some((Placeholder::Reg8(x), None)), false));
-            opcodes.insert(0xB8, Opcode::new(Rc::new(Self::mov_reg), NumArgs::Two, 1, Some((Placeholder::Reg16(x), None)), false));
+            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov_imm), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))), true));
+            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov_imm), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), true));
         }
-        opcodes.insert(0xC8, Opcode::new(Rc::new(Self::mov_imm), NumArgs::Two, 1, None, true));
+        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov_imm), NumArgs::Two, 1, None, true));
 
         Self {
             ram,
@@ -122,12 +123,13 @@ impl CPU {
             self.instruction = None;
         } else {
             let code = self.read_ip();
-            let d = code & 0x01 >> 0;
-            let s = code & 0x02 >> 1;
+            let d = code & 0x02 >> 1;
+            let s = code & 0x01 >> 0;
             let opcode = match self.opcodes.get(&code) {
                 Some(opcode) => opcode,
                 None => self.opcodes.get(&(code & 0xFC)).unwrap()
             };
+            self.instruction = Some(opcode.clone());
             self.next_cycles += opcode.cycles;
             let immediate = opcode.immediate;
             let num_args = opcode.num_args;
@@ -154,37 +156,37 @@ impl CPU {
                         let rm = (mod_reg_rm & 0x07) >> 0;
                         let reg = (mod_reg_rm & 0x38) >> 3;
                         let mod_bits = (mod_reg_rm & 0xC0) >> 6;
-                        let arg1 = Some(Self::reg_to_arg(reg, s));
                         let arg2 = {
                             if let None = self.src {
-                                if immediate {
-                                    Some(
-                                        if s == 1 {
-                                            Arg::Imm16((self.read_ip() as u16) & ((self.read_ip() as u16) << 8))
-                                        } else {
-                                            Arg::Imm8(self.read_ip())
-                                        }
-                                    )
-                                } else {
-                                    self.translate_mod_rm(mod_bits, rm, s)
-                                }
+                                self.translate_mod_rm(mod_bits, rm, s)
                             } else {
                                 None
                             }
                         };
+                        let arg1 = if immediate {
+                            Some(
+                                if s == 1 {
+                                    Arg::Imm16(self.read_ip_word())
+                                } else {
+                                    Arg::Imm8(self.read_ip())
+                                }
+                            )
+                        } else {
+                            Some(Self::reg_to_arg(reg, s))
+                        };
 
-                        if d == 1 && !immediate {
-                            if let Some(_) = self.src {
+                        if d == 1 || immediate {
+                            if let None = self.src {
                                 self.src = arg1;
                             }
-                            if let Some(_) = self.dst {
+                            if let None = self.dst {
                                 self.dst = arg2;
                             }
                         } else {
-                            if let Some(_) = self.src {
+                            if let None = self.src {
                                 self.src = arg2;
                             }
-                            if let Some(_) = self.dst {
+                            if let None = self.dst {
                                 self.dst = arg1;
                             }
                         }
@@ -208,13 +210,21 @@ impl CPU {
         val
     }
 
+    fn read_ip_word(&mut self) -> u16 {
+        (self.read_ip() as u16) | ((self.read_ip() as u16) << 8)
+    }
+
     fn translate_mod_rm(&mut self, mod_bits: u8, rm: u8, s: u8) -> Option<Arg> {
-        match mod_bits {
-            0 => Some(Arg::Ptr(self.regs.get(Self::translate_reg16(rm).unwrap().as_str()).unwrap().value)),
-            1 => Some(Arg::Ptr(self.regs.get(Self::translate_reg16(rm).unwrap().as_str()).unwrap().value + (self.read_ip() as u16))),
-            2 => Some(Arg::Ptr(self.regs.get(Self::translate_reg16(rm).unwrap().as_str()).unwrap().value + (self.read_ip() as u16) + (self.read_ip() as u16))),
-            3 => Some(Self::reg_to_arg(rm, s)),
-            _ => None
+        if mod_bits == 0b00 && rm == 0b101 {
+            Some(Arg::Ptr(self.read_ip_word()))
+        } else {
+            match mod_bits {
+                0 => Some(Arg::Ptr(self.regs.get(Self::translate_reg16(rm).unwrap().as_str()).unwrap().value)),
+                1 => Some(Arg::Ptr(self.regs.get(Self::translate_reg16(rm).unwrap().as_str()).unwrap().value + (self.read_ip() as u16))),
+                2 => Some(Arg::Ptr(self.regs.get(Self::translate_reg16(rm).unwrap().as_str()).unwrap().value + (self.read_ip_word()))),
+                3 => Some(Self::reg_to_arg(rm, s)),
+                _ => None
+            }
         }
     }
 
@@ -225,6 +235,13 @@ impl CPU {
                     Arg::Reg16(reg)
                 } else {
                     Arg::Reg8(reg)
+                }
+            },
+            Placeholder::Imm => {
+                if s == 1 {
+                    Arg::Imm16((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
+                } else {
+                    Arg::Imm8(self.read_ip())
                 }
             }
             Placeholder::Reg8(reg) => Arg::Reg8(reg),
@@ -255,34 +272,40 @@ impl CPU {
 
     fn reg_to_arg(reg: u8, s: u8) -> Arg {
         if s == 1 {
-            Arg::Reg8(reg)
+            Arg::Reg16(reg)
         } else {
             Arg::Reg8(reg)
         }
     }
 
-    fn read_reg(&self, reg: String) -> Option<u16> {
+    pub fn read_reg(&self, reg: String) -> Option<u16> {
         match self.regs.get(&reg) {
             Some(val) => Some(val.value),
             None => None
         }
     }
 
-    fn read_mem(&self, loc: usize) -> u8 {
+    pub fn read_mem(&self, loc: usize) -> u8 {
         self.ram[loc]
     }
 
-    fn load(&mut self, data: Vec<u8>, loc: usize) {
+    pub fn load(&mut self, data: Vec<u8>, loc: usize) {
         for i in 0..data.len() {
             self.ram[loc + i] = data[i];
         }
-        self.regs.get_mut("ip").unwrap().value = (loc as u16);
+        self.regs.get_mut("ip").unwrap().value = loc as u16;
     }
 
-    fn execute_next(&mut self) {
-        while { match self.instruction { Some(_) => true, None => false } } {
+    pub fn execute_next(&mut self) {
+        self.step();
+        while match self.instruction { Some(_) => true, None => false } {
             self.step();
         }
+    }
+
+    pub fn execute_next_from(&mut self, loc: u16) {
+        self.regs.get_mut("ip").unwrap().value = loc;
+        self.execute_next();
     }
 
     fn translate_reg16(num: u8) -> Option<String> {

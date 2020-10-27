@@ -1,10 +1,9 @@
 use super::{CPU, Arg};
-use std::borrow::Borrow;
 
 impl CPU {
     pub fn mov_imm(&mut self) -> usize {
-        let mut size = false;
-        let mut val = 0;
+        let size;
+        let val ;
 
         match self.src.clone().unwrap() {
             Arg::Imm8(value) => {
@@ -28,7 +27,7 @@ impl CPU {
             Arg::Reg16(_) | Arg::Imm16(_) => true,
             _ => false
         };
-        let mut val = 0;
+        let mut val;
         let mut cycles = 0;
 
         match self.src.clone().unwrap() {
@@ -51,7 +50,7 @@ impl CPU {
                     val |= (self.ram[(ptr + 1) as usize] as u16) << 8;
                     cycles += 1;
                 }
-                cycles = 1;
+                cycles += 1;
             }
             _ => {
                 return 0;
