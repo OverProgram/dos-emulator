@@ -149,10 +149,12 @@ impl CPU {
         } else if let Some(opcode) = self.instruction.clone() {
             (opcode.instruction)(self);
             self.instruction = None;
+            self.src = None;
+            self.dst = None;
         } else {
             let code = self.read_ip();
-            let d = code & 0x02 >> 1;
-            let s = code & 0x01 >> 0;
+            let d = (code & 0x02) >> 1;
+            let mut s = (code & 0x01) >> 0;
             let opcode = match self.opcodes.get(&code) {
                 Some(opcode) => opcode,
                 None => self.opcodes.get(&(code & 0xFC)).unwrap()
@@ -165,6 +167,11 @@ impl CPU {
 
             if let Some((arg1, arg2)) = opcode.shorthand.clone() {
                 let arg1_translated = Some(self.translate_placeholder(arg1, s));
+                s = match arg1_translated.clone().unwrap() {
+                    Arg::Reg8(_) => 0,
+                    Arg::Reg16(_) => 1,
+                    _ => s
+                };
                 let mut arg2_translated = None;
                 if let Some(arg) = arg2 {
                     arg2_translated = Some(self.translate_placeholder(arg, s));
@@ -245,6 +252,8 @@ impl CPU {
     fn translate_mod_rm(&mut self, mod_bits: u8, rm: u8, s: u8) -> Option<Arg> {
         if mod_bits == 0b00 && rm == 0b101 {
             Some(Arg::Ptr(self.read_ip_word()))
+        } else if rm == 0b100 {
+            self.translate_sib(mod_bits, rm)
         } else {
             match mod_bits {
                 0 => Some(Arg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value)),
@@ -254,6 +263,23 @@ impl CPU {
                 _ => None
             }
         }
+    }
+
+    fn translate_sib(&mut self, mod_bits: u8, rm: u8) -> Option<Arg> {
+        let sib = self.read_ip();
+        // let displacement = (self.read_ip() as i8) as i16;
+        let displacement = match mod_bits {
+            1 => (self.read_ip() as i8) as i16,
+            2 => self.read_ip_word() as i16,
+            _ => 0
+        };
+        let scale_bits = (sib & 0xC0) >> 6;
+        let index_bits = (sib & 0x38) >> 3;
+        let base_bits = (sib & 0x07) >> 0;
+        let scale_value = if scale_bits < 4 { 2_i16.pow(scale_bits as u32) } else { 0 };
+        let index_value = self.regs.get(&(if index_bits == 0b100 { None } else { Self::translate_reg16(index_bits) }).unwrap()).unwrap().value as i16;
+        let base_value = if mod_bits == 0 && base_bits == 0b101 { 0 } else { self.regs.get(&Self::translate_reg16(base_bits).unwrap()).unwrap().value } as i16;
+        Some(Arg::Ptr(((index_value * scale_value) + base_value + displacement) as u16))
     }
 
     fn translate_placeholder(&mut self, placeholder: Placeholder, s: u8) -> Arg {
