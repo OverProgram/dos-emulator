@@ -1,30 +1,13 @@
 use super::{CPU, Arg};
 
 impl CPU {
-    pub fn mov_imm(&mut self) -> usize {
-        let size;
-        let val ;
-
-        match self.src.clone().unwrap() {
-            Arg::Imm8(value) => {
-                val = value as u16;
-                size = false;
-            }
-            Arg::Imm16(value) => {
-                val = value;
-                size = true;
-            }
-            _ => {
-                return 0;
-            }
-        }
-
-        self.mov(val, self.dst.clone().unwrap(), size)
-    }
-
-    pub fn mov_reg(&mut self) -> usize {
+    pub fn mov(&mut self) -> usize {
         let mut size = match self.dst.clone().unwrap() {
-            Arg::Reg16(_) | Arg::Imm16(_) => true,
+            Arg::Reg16(_) => true,
+            Arg::Ptr(_) => match self.src.clone().unwrap() {
+                Arg::Imm16(_) | Arg::Reg16(_) => true,
+                _ => false
+            },
             _ => false
         };
         let mut val;
@@ -51,17 +34,15 @@ impl CPU {
                 }
                 cycles += 1;
             }
-            _ => {
-                return 0;
+            Arg::Imm16(value) => {
+                val = value;
+            }
+            Arg::Imm8(value) => {
+                val = value as u16;
             }
         }
 
-        self.mov(val, self.dst.clone().unwrap(), size) + cycles
-    }
-
-
-    fn mov(&mut self, val: u16, dst: Arg, size: bool) -> usize {
-        match dst {
+        match self.dst.clone().unwrap() {
             Arg::Ptr(ptr) => {
                 self.ram[ptr as usize] = (val & 0xFF) as u8;
                 if size {

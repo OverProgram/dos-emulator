@@ -123,14 +123,13 @@ impl CPU {
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
         // Move opcodes
-        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov_reg), NumArgs::Two, 1, None, false));
-        // opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov_ax), One, 1, None, false));
-        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov_reg), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), false));
+        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, false));
+        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), false));
         for x in 0..7 {
-            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov_imm), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))), true));
-            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov_imm), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), true));
+            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))), true));
+            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), true));
         }
-        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov_imm), NumArgs::Two, 1, None, true));
+        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, true));
 
         Self {
             ram,
@@ -267,7 +266,6 @@ impl CPU {
 
     fn translate_sib(&mut self, mod_bits: u8, rm: u8) -> Option<Arg> {
         let sib = self.read_ip();
-        // let displacement = (self.read_ip() as i8) as i16;
         let displacement = match mod_bits {
             1 => (self.read_ip() as i8) as i16,
             2 => self.read_ip_word() as i16,
