@@ -13,12 +13,18 @@ enum NumArgs {
 }
 
 #[derive(Clone, Debug)]
-enum Arg {
+enum DstArg {
     Reg8(u8),
     Reg16(u8),
     Imm8(u8),
     Imm16(u16),
     Ptr(u16)
+}
+
+#[derive(Clone, Debug)]
+enum SrcArg {
+    Byte(u8),
+    Word(u16)
 }
 
 #[derive(Clone, Debug)]
@@ -57,15 +63,10 @@ pub enum Regs {
     IP
 }
 
-pub enum Regs8 {
-    AH,
-    BH,
-    CH,
-    DH,
-    AL,
-    BL,
-    CL,
-    DL
+#[derive(Copy, Clone, Debug)]
+enum WordPart {
+    Low,
+    High
 }
 
 #[derive(Clone)]
@@ -94,8 +95,8 @@ pub struct CPU {
     regs: HashMap<Regs, reg::Reg>,
     opcodes: HashMap<u8, Opcode>,
     instruction: Option<Opcode>,
-    src: Option<Arg>,
-    dst: Option<Arg>,
+    src: Option<SrcArg>,
+    dst: Option<DstArg>,
     next_cycles: usize,
 }
 
@@ -167,8 +168,8 @@ impl CPU {
             if let Some((arg1, arg2)) = opcode.shorthand.clone() {
                 let arg1_translated = Some(self.translate_placeholder(arg1, s));
                 s = match arg1_translated.clone().unwrap() {
-                    Arg::Reg8(_) => 0,
-                    Arg::Reg16(_) => 1,
+                    DstArg::Reg8(_) => 0,
+                    DstArg::Reg16(_) => 1,
                     _ => s
                 };
                 let mut arg2_translated = None;
@@ -176,10 +177,10 @@ impl CPU {
                     arg2_translated = Some(self.translate_placeholder(arg, s));
                 }
                 if d == 1 && !immediate {
-                    self.src = arg1_translated;
+                    self.src = self.get_src_arg(arg1_translated.unwrap(), s);
                     self.dst = arg2_translated;
                 } else {
-                    self.src = arg2_translated;
+                    self.src = self.get_src_arg(arg2_translated.unwrap(), s);
                     self.dst = arg1_translated;
                 }
             }
@@ -200,9 +201,9 @@ impl CPU {
                         let arg1 = if immediate {
                             Some(
                                 if s == 1 {
-                                    Arg::Imm16(self.read_ip_word())
+                                    DstArg::Imm16(self.read_ip_word())
                                 } else {
-                                    Arg::Imm8(self.read_ip())
+                                    DstArg::Imm8(self.read_ip())
                                 }
                             )
                         } else {
@@ -211,14 +212,14 @@ impl CPU {
 
                         if d == 1 || immediate {
                             if let None = self.src {
-                                self.src = arg1;
+                                self.src = self.get_src_arg(arg1.unwrap(), s);
                             }
                             if let None = self.dst {
                                 self.dst = arg2;
                             }
                         } else {
                             if let None = self.src {
-                                self.src = arg2;
+                                self.src = self.get_src_arg(arg2.unwrap(), s);
                             }
                             if let None = self.dst {
                                 self.dst = arg1;
@@ -230,7 +231,8 @@ impl CPU {
                     let mod_reg_rm = self.read_ip();
                     let rm = (mod_reg_rm & 0x07) >> 0;
                     let mod_bits = (mod_reg_rm & 0xC0) >> 6;
-                    self.src = self.translate_mod_rm(mod_bits, rm, s);
+                    let arg = self.translate_mod_rm(mod_bits, rm, s);
+                    self.src = self.get_src_arg(arg.unwrap(), s);
                 },
                 NumArgs::Zero => ()
             }
@@ -244,27 +246,111 @@ impl CPU {
         val
     }
 
+    fn get_reg_16(&self, reg_num: u8) -> Option<u16> {
+        Some(self.regs.get(&Self::translate_reg16(reg_num)?)?.value)
+    }
+
+    fn get_reg_8(&self, reg_num: u8) -> Option<u8> {
+        let (reg, part) = Self::translate_reg8(reg_num)?;
+        match part {
+            WordPart::High => Some(self.regs.get(&reg)?.get_high()),
+            WordPart::Low => Some(self.regs.get(&reg)?.get_low())
+        }
+    }
+
+    fn get_src_arg(&mut self, arg: DstArg, s: u8) -> Option<SrcArg> {
+        match arg {
+            DstArg::Reg8(reg) => Some(SrcArg::Byte(self.get_reg_8(reg)?)),
+            DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
+            DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
+            DstArg::Imm16(val) => Some(SrcArg::Word(val)),
+            DstArg::Ptr(ptr) => if s == 1 { Some(SrcArg::Word(self.read_mem_word(ptr)?)) } else { Some(SrcArg::Byte(self.read_mem_byte(ptr)?)) }
+        }
+    }
+
+    fn read_mem_byte(&mut self, ptr: u16) -> Option<u8> {
+        if ptr > self.ram.len() as u16 {
+            None
+        } else {
+            self.next_cycles += 1;
+            Some(self.ram[ptr as usize])
+        }
+    }
+
+    fn read_mem_word(&mut self, ptr: u16) -> Option<u16> {
+        Some((self.read_mem_byte(ptr)? as u16) | ((self.read_mem_byte(ptr + 1)? as u16) << 8))
+    }
+
+    fn write_mem_byte(&mut self, ptr: u16, val: u8) -> Result<(), &str> {
+        if ptr > self.ram.len() as u16 {
+            Err("Write out of bounds")
+        } else {
+            self.ram[ptr as usize] = (val & 0xFF) as u8;
+            self.next_cycles += 1;
+            Ok(())
+        }
+    }
+
+    fn write_mem_word(&mut self, ptr: u16, val: u16) -> Result<(), &str> {
+        self.write_mem_byte(ptr, (val & 0x00FF) as u8);
+        self.write_mem_byte(ptr, ((ptr & 0xFF00) >> 8) as u8)
+    }
+
     fn read_ip_word(&mut self) -> u16 {
         (self.read_ip() as u16) | ((self.read_ip() as u16) << 8)
     }
 
-    fn translate_mod_rm(&mut self, mod_bits: u8, rm: u8, s: u8) -> Option<Arg> {
+    fn write_to_arg(&mut self, arg: DstArg, val_arg: SrcArg) -> Result<(), &str> {
+        match arg {
+            DstArg::Reg16(reg) => {
+                self.regs.get_mut(&Self::translate_reg16(reg).unwrap()).unwrap().value = if let SrcArg::Word(value) = val_arg {
+                        value
+                    } else {
+                        return Err("Mismatch oparend sizes");
+                    };
+                Ok(())
+            },
+            DstArg::Reg8(reg_num) => {
+                let (reg_enum, part) = Self::translate_reg8(reg_num).unwrap();
+                let reg = self.regs.get_mut(&reg_enum).unwrap();
+                let value = if let SrcArg::Byte(val) = val_arg {
+                    val
+                } else {
+                    return Err("Mismatch oparend sizes");
+                };
+                match part {
+                    WordPart::Low => { reg.set_low(value) },
+                    WordPart::High => { reg.set_high(value) }
+                }
+                Ok(())
+            },
+            DstArg::Ptr(ptr) => {
+                match val_arg {
+                    SrcArg::Byte(val) => self.write_mem_byte(ptr, val),
+                    SrcArg::Word(val) => self.write_mem_word(ptr, val)
+                }
+            },
+            _ => Err("Invalid dst arg")
+        }
+    }
+
+    fn translate_mod_rm(&mut self, mod_bits: u8, rm: u8, s: u8) -> Option<DstArg> {
         if mod_bits == 0b00 && rm == 0b101 {
-            Some(Arg::Ptr(self.read_ip_word()))
+            Some(DstArg::Ptr(self.read_ip_word()))
         } else if rm == 0b100 {
-            self.translate_sib(mod_bits, rm)
+            self.translate_sib(mod_bits)
         } else {
             match mod_bits {
-                0 => Some(Arg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value)),
-                1 => Some(Arg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip() as u16))),
-                2 => Some(Arg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip_word()))),
+                0 => Some(DstArg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value)),
+                1 => Some(DstArg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip() as u16))),
+                2 => Some(DstArg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip_word()))),
                 3 => Some(Self::reg_to_arg(rm, s)),
                 _ => None
             }
         }
     }
 
-    fn translate_sib(&mut self, mod_bits: u8, rm: u8) -> Option<Arg> {
+    fn translate_sib(&mut self, mod_bits: u8) -> Option<DstArg> {
         let sib = self.read_ip();
         let displacement = match mod_bits {
             1 => (self.read_ip() as i8) as i16,
@@ -277,28 +363,28 @@ impl CPU {
         let scale_value = if scale_bits < 4 { 2_i16.pow(scale_bits as u32) } else { 0 };
         let index_value = self.regs.get(&(if index_bits == 0b100 { None } else { Self::translate_reg16(index_bits) }).unwrap()).unwrap().value as i16;
         let base_value = if mod_bits == 0 && base_bits == 0b101 { 0 } else { self.regs.get(&Self::translate_reg16(base_bits).unwrap()).unwrap().value } as i16;
-        Some(Arg::Ptr(((index_value * scale_value) + base_value + displacement) as u16))
+        Some(DstArg::Ptr(((index_value * scale_value) + base_value + displacement) as u16))
     }
 
-    fn translate_placeholder(&mut self, placeholder: Placeholder, s: u8) -> Arg {
+    fn translate_placeholder(&mut self, placeholder: Placeholder, s: u8) -> DstArg {
         match placeholder {
             Placeholder::Reg(reg) => {
                 if s == 1 {
-                    Arg::Reg16(reg)
+                    DstArg::Reg16(reg)
                 } else {
-                    Arg::Reg8(reg)
+                    DstArg::Reg8(reg)
                 }
             },
             Placeholder::Imm => {
                 if s == 1 {
-                    Arg::Imm16((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
+                    DstArg::Imm16((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
                 } else {
-                    Arg::Imm8(self.read_ip())
+                    DstArg::Imm8(self.read_ip())
                 }
             }
-            Placeholder::Reg8(reg) => Arg::Reg8(reg),
-            Placeholder::Reg16(reg) => Arg::Reg16(reg),
-            Placeholder::Ptr => Arg::Ptr((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
+            Placeholder::Reg8(reg) => DstArg::Reg8(reg),
+            Placeholder::Reg16(reg) => DstArg::Reg16(reg),
+            Placeholder::Ptr => DstArg::Ptr((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
         }
     }
 
@@ -322,11 +408,11 @@ impl CPU {
         reg.set_low(val);
     }
 
-    fn reg_to_arg(reg: u8, s: u8) -> Arg {
+    fn reg_to_arg(reg: u8, s: u8) -> DstArg {
         if s == 1 {
-            Arg::Reg16(reg)
+            DstArg::Reg16(reg)
         } else {
-            Arg::Reg8(reg)
+            DstArg::Reg8(reg)
         }
     }
 
@@ -374,7 +460,7 @@ impl CPU {
         }
     }
 
-    fn translate_reg8(num: u8) -> Option<Regs> {
-        Self::translate_reg16(num % 4)
+    fn translate_reg8(num: u8) -> Option<(Regs, WordPart)> {
+        Some((Self::translate_reg16(num % 4)?, if num / 2 == 0 { WordPart::Low } else { WordPart::High }))
     }
 }
