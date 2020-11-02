@@ -1,5 +1,6 @@
 mod reg;
 mod mem;
+mod alu;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -18,7 +19,8 @@ enum DstArg {
     Reg16(u8),
     Imm8(u8),
     Imm16(u16),
-    Ptr(u16)
+    Ptr16(u16),
+    Ptr8(u16)
 }
 
 #[derive(Clone, Debug)]
@@ -177,10 +179,10 @@ impl CPU {
                     arg2_translated = Some(self.translate_placeholder(arg, s));
                 }
                 if d == 1 && !immediate {
-                    self.src = self.get_src_arg(arg1_translated.unwrap(), s);
+                    self.src = self.get_src_arg(arg1_translated.unwrap());
                     self.dst = arg2_translated;
                 } else {
-                    self.src = self.get_src_arg(arg2_translated.unwrap(), s);
+                    self.src = self.get_src_arg(arg2_translated.unwrap());
                     self.dst = arg1_translated;
                 }
             }
@@ -212,14 +214,14 @@ impl CPU {
 
                         if d == 1 || immediate {
                             if let None = self.src {
-                                self.src = self.get_src_arg(arg1.unwrap(), s);
+                                self.src = self.get_src_arg(arg1.unwrap());
                             }
                             if let None = self.dst {
                                 self.dst = arg2;
                             }
                         } else {
                             if let None = self.src {
-                                self.src = self.get_src_arg(arg2.unwrap(), s);
+                                self.src = self.get_src_arg(arg2.unwrap());
                             }
                             if let None = self.dst {
                                 self.dst = arg1;
@@ -232,7 +234,7 @@ impl CPU {
                     let rm = (mod_reg_rm & 0x07) >> 0;
                     let mod_bits = (mod_reg_rm & 0xC0) >> 6;
                     let arg = self.translate_mod_rm(mod_bits, rm, s);
-                    self.src = self.get_src_arg(arg.unwrap(), s);
+                    self.dst = arg;
                 },
                 NumArgs::Zero => ()
             }
@@ -258,13 +260,14 @@ impl CPU {
         }
     }
 
-    fn get_src_arg(&mut self, arg: DstArg, s: u8) -> Option<SrcArg> {
+    fn get_src_arg(&mut self, arg: DstArg) -> Option<SrcArg> {
         match arg {
             DstArg::Reg8(reg) => Some(SrcArg::Byte(self.get_reg_8(reg)?)),
             DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
             DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
             DstArg::Imm16(val) => Some(SrcArg::Word(val)),
-            DstArg::Ptr(ptr) => if s == 1 { Some(SrcArg::Word(self.read_mem_word(ptr)?)) } else { Some(SrcArg::Byte(self.read_mem_byte(ptr)?)) }
+            DstArg::Ptr16(ptr) => Some(SrcArg::Word(self.read_mem_word(ptr)?)),
+            DstArg::Ptr8(ptr) => Some(SrcArg::Byte(self.read_mem_byte(ptr)?))
         }
     }
 
@@ -324,7 +327,7 @@ impl CPU {
                 }
                 Ok(())
             },
-            DstArg::Ptr(ptr) => {
+            DstArg::Ptr16(ptr) => {
                 match val_arg {
                     SrcArg::Byte(val) => self.write_mem_byte(ptr, val),
                     SrcArg::Word(val) => self.write_mem_word(ptr, val)
@@ -336,16 +339,26 @@ impl CPU {
 
     fn translate_mod_rm(&mut self, mod_bits: u8, rm: u8, s: u8) -> Option<DstArg> {
         if mod_bits == 0b00 && rm == 0b101 {
-            Some(DstArg::Ptr(self.read_ip_word()))
+            Some(DstArg::Ptr16(self.read_ip_word()))
         } else if rm == 0b100 {
             self.translate_sib(mod_bits)
         } else {
-            match mod_bits {
-                0 => Some(DstArg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value)),
-                1 => Some(DstArg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip() as u16))),
-                2 => Some(DstArg::Ptr(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip_word()))),
-                3 => Some(Self::reg_to_arg(rm, s)),
-                _ => None
+            if s == 1 {
+                match mod_bits {
+                    0 => Some(DstArg::Ptr16(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value)),
+                    1 => Some(DstArg::Ptr16(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip() as u16))),
+                    2 => Some(DstArg::Ptr16(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip_word()))),
+                    3 => Some(Self::reg_to_arg(rm, s)),
+                    _ => None
+                }
+            } else {
+                match mod_bits {
+                    0 => Some(DstArg::Ptr8(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value)),
+                    1 => Some(DstArg::Ptr8(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip() as u16))),
+                    2 => Some(DstArg::Ptr8(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip_word()))),
+                    3 => Some(Self::reg_to_arg(rm, s)),
+                    _ => None
+                }
             }
         }
     }
@@ -363,7 +376,7 @@ impl CPU {
         let scale_value = if scale_bits < 4 { 2_i16.pow(scale_bits as u32) } else { 0 };
         let index_value = self.regs.get(&(if index_bits == 0b100 { None } else { Self::translate_reg16(index_bits) }).unwrap()).unwrap().value as i16;
         let base_value = if mod_bits == 0 && base_bits == 0b101 { 0 } else { self.regs.get(&Self::translate_reg16(base_bits).unwrap()).unwrap().value } as i16;
-        Some(DstArg::Ptr(((index_value * scale_value) + base_value + displacement) as u16))
+        Some(DstArg::Ptr16(((index_value * scale_value) + base_value + displacement) as u16))
     }
 
     fn translate_placeholder(&mut self, placeholder: Placeholder, s: u8) -> DstArg {
@@ -384,7 +397,7 @@ impl CPU {
             }
             Placeholder::Reg8(reg) => DstArg::Reg8(reg),
             Placeholder::Reg16(reg) => DstArg::Reg16(reg),
-            Placeholder::Ptr => DstArg::Ptr((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
+            Placeholder::Ptr => DstArg::Ptr16((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
         }
     }
 
@@ -406,6 +419,42 @@ impl CPU {
     fn set_reg_low(&mut self, num: u8, val: u8) {
         let reg = self.regs.get_mut(&Self::translate_reg16(num % 4).unwrap()).unwrap();
         reg.set_low(val);
+    }
+
+    fn operation_1_arg<T, U>(&mut self, byte: T, word: U) -> SrcArg where
+        T: Fn(u8)-> u8,
+        U: Fn(u16) -> u16
+    {
+        match self.get_src_arg(self.dst.clone().unwrap()) {
+            SrcArg::Word(dst) => {
+                Some(SrcArg::Word(word(dst)))
+            },
+            SrcArg::Byte(dst) => {
+                Some(SrcArg::Byte(byte(dst)))
+            }
+        }.unwrap()
+    }
+
+    fn operation_2_args<T, U>(&mut self, byte: T, word: U) -> SrcArg where
+    T: Fn(u8, u8)-> u8,
+    U: Fn(u16, u16) -> u16
+    {
+        match self.src.clone().unwrap() {
+            SrcArg::Word(src) => {
+                if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                    Some(SrcArg::Word(word(src, dst)))
+                } else {
+                    None
+                }
+            },
+            SrcArg::Byte(src) => {
+                if let SrcArg::Byte(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                    Some(SrcArg::Byte(byte(src, dst)))
+                } else {
+                    None
+                }
+            }
+        }.unwrap()
     }
 
     fn reg_to_arg(reg: u8, s: u8) -> DstArg {

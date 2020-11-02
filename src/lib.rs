@@ -41,4 +41,8 @@ mod tests {
         computer.execute_next();
         assert_eq!(computer.read_reg(cpu::Regs::CX).unwrap(), 0xAAAA);
     }
+
+    fn test_add() {
+
+    }
 }
