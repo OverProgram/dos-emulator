@@ -1,4 +1,4 @@
-use super::{CPU, SrcArg};
+use super::{CPU};
 
 impl CPU {
     pub fn add(&mut self) -> usize {
@@ -14,12 +14,12 @@ impl CPU {
     }
 
     pub fn inc(&mut self) {
-        let sum = self.operation_1_arg(|dst|, dst + 1);
+        let sum = self.operation_1_arg(|dst| dst + 1, |dst| dst + 1);
         self.write_to_arg(self.dst.clone().unwrap(), sum);
     }
 
     pub fn dec(&mut self) {
-        let sum = self.operation_1_arg(|dst|, dst - 1);
+        let sum = self.operation_1_arg(|dst| dst - 1, |dst| dst - 1);
         self.write_to_arg(self.dst.clone().unwrap(), sum);
     }
 }

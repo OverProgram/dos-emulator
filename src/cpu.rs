@@ -4,7 +4,14 @@ mod alu;
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::option::Option::Some;
+
+struct OpcodeFlags;
+
+impl OpcodeFlags {
+    const NONE : u32 = 0;
+    const IMMEDIATE: u32 = 0x01;
+    const SIZE_MISMATCH: u32 = 0x02;
+}
 
 #[derive(Clone, Copy, Debug)]
 enum NumArgs {
@@ -77,17 +84,24 @@ struct Opcode {
     num_args: NumArgs,
     cycles: usize,
     shorthand: Option<(Placeholder, Option<Placeholder>)>,
-    immediate: bool
+    flags: u32
 }
 
 impl Opcode {
-    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, immediate: bool) -> Self {
+    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, flags: u32) -> Self {
         Self {
             instruction,
             num_args,
             cycles,
             shorthand,
-            immediate
+            flags
+        }
+    }
+
+    fn has_flag(&self, flag: u32) -> Result<bool, &str> {
+        match flag {
+            OpcodeFlags::SIZE_MISMATCH | OpcodeFlags::IMMEDIATE => Ok(if (self.flags & flag) > 0 { true } else { false }),
+            _ => Err("invalid flags!")
         }
     }
 }
@@ -104,7 +118,7 @@ pub struct CPU {
 
 impl CPU {
     pub fn new(ram_size: usize) -> Self {
-        // Create and allocate the virtual ram
+        // Create and allocate the ram
         let ram: Vec<u8> = vec![0; ram_size];
 
         // Create register HashMap
@@ -126,13 +140,18 @@ impl CPU {
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
         // Move opcodes
-        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, false));
-        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), false));
+        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, OpcodeFlags::NONE));
+        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), OpcodeFlags::NONE));
         for x in 0..7 {
-            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))), true));
-            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), true));
+            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
+            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
         }
-        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, true));
+        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE));
+        // Add opcodes
+        opcodes.insert(0x00, Opcode::new(Rc::new(Self::add), NumArgs::Two, 1, None, OpcodeFlags::NONE));
+        opcodes.insert(0x04, Opcode::new(Rc::new(Self::add), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0x80, Opcode::new(Rc::new(Self::add), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0x83, Opcode::new(Rc::new(Self::add), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
 
         Self {
             ram,
@@ -163,7 +182,8 @@ impl CPU {
             };
             self.instruction = Some(opcode.clone());
             self.next_cycles += opcode.cycles;
-            let immediate = opcode.immediate;
+            let immediate = opcode.has_flag(OpcodeFlags::IMMEDIATE).unwrap();
+            let size_mismatch = opcode.has_flag(OpcodeFlags::SIZE_MISMATCH).unwrap();
             let num_args = opcode.num_args;
             let shorthand = opcode.shorthand.clone();
 
@@ -202,7 +222,7 @@ impl CPU {
                         };
                         let arg1 = if immediate {
                             Some(
-                                if s == 1 {
+                                if s == 1 && !size_mismatch {
                                     DstArg::Imm16(self.read_ip_word())
                                 } else {
                                     DstArg::Imm8(self.read_ip())
@@ -338,16 +358,29 @@ impl CPU {
     }
 
     fn translate_mod_rm(&mut self, mod_bits: u8, rm: u8, s: u8) -> Option<DstArg> {
-        if mod_bits == 0b00 && rm == 0b101 {
+        if mod_bits == 0b00 && rm == 0b110 {
             Some(DstArg::Ptr16(self.read_ip_word()))
-        } else if rm == 0b100 {
-            self.translate_sib(mod_bits)
         } else {
+            let (reg1, reg2) = match rm {
+                0b000 => Some((Regs::BX, Some(Regs::SI))),
+                0b001 => Some((Regs::BX, Some(Regs::DI))),
+                0b010 => Some((Regs::BP, Some(Regs::SI))),
+                0b011 => Some((Regs::BP, Some(Regs::DI))),
+                0b100 => Some((Regs::SI, None)),
+                0b101 => Some((Regs::DI, None)),
+                0b111 => Some((Regs::BX, None)),
+                _ => None
+            }.unwrap();
+            let ptr_val = if let Some(reg) = reg2 {
+                self.regs.get(&reg1).unwrap().value + self.regs.get(&reg).unwrap().value
+            } else {
+                self.regs.get(&reg1).unwrap().value
+            };
             if s == 1 {
                 match mod_bits {
-                    0 => Some(DstArg::Ptr16(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value)),
-                    1 => Some(DstArg::Ptr16(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip() as u16))),
-                    2 => Some(DstArg::Ptr16(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip_word()))),
+                    0 => Some(DstArg::Ptr16(ptr_val)),
+                    1 => Some(DstArg::Ptr16(ptr_val + (self.read_ip() as u16))),
+                    2 => Some(DstArg::Ptr16(ptr_val + (self.read_ip_word()))),
                     3 => Some(Self::reg_to_arg(rm, s)),
                     _ => None
                 }
@@ -425,7 +458,7 @@ impl CPU {
         T: Fn(u8)-> u8,
         U: Fn(u16) -> u16
     {
-        match self.get_src_arg(self.dst.clone().unwrap()) {
+        match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Word(dst) => {
                 Some(SrcArg::Word(word(dst)))
             },
@@ -450,6 +483,8 @@ impl CPU {
             SrcArg::Byte(src) => {
                 if let SrcArg::Byte(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
                     Some(SrcArg::Byte(byte(src, dst)))
+                } else if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                    Some(SrcArg::Word(word(src as u16, dst)))
                 } else {
                     None
                 }
