@@ -51,8 +51,7 @@ pub enum AddressingMode {
     Direct,
     Indirect,
     IndirectIndex,
-    Relative,
-    SIB
+    Relative
 }
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
@@ -394,22 +393,6 @@ impl CPU {
                 }
             }
         }
-    }
-
-    fn translate_sib(&mut self, mod_bits: u8) -> Option<DstArg> {
-        let sib = self.read_ip();
-        let displacement = match mod_bits {
-            1 => (self.read_ip() as i8) as i16,
-            2 => self.read_ip_word() as i16,
-            _ => 0
-        };
-        let scale_bits = (sib & 0xC0) >> 6;
-        let index_bits = (sib & 0x38) >> 3;
-        let base_bits = (sib & 0x07) >> 0;
-        let scale_value = if scale_bits < 4 { 2_i16.pow(scale_bits as u32) } else { 0 };
-        let index_value = self.regs.get(&(if index_bits == 0b100 { None } else { Self::translate_reg16(index_bits) }).unwrap()).unwrap().value as i16;
-        let base_value = if mod_bits == 0 && base_bits == 0b101 { 0 } else { self.regs.get(&Self::translate_reg16(base_bits).unwrap()).unwrap().value } as i16;
-        Some(DstArg::Ptr16(((index_value * scale_value) + base_value + displacement) as u16))
     }
 
     fn translate_placeholder(&mut self, placeholder: Placeholder, s: u8) -> DstArg {
