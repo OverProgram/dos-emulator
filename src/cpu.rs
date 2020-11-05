@@ -113,6 +113,7 @@ pub struct CPU {
     src: Option<SrcArg>,
     dst: Option<DstArg>,
     next_cycles: usize,
+    reg_bits: u8
 }
 
 impl CPU {
@@ -146,11 +147,19 @@ impl CPU {
             opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
         }
         opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE));
-        // Add opcodes
-        opcodes.insert(0x00, Opcode::new(Rc::new(Self::add), NumArgs::Two, 1, None, OpcodeFlags::NONE));
-        opcodes.insert(0x04, Opcode::new(Rc::new(Self::add), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
-        opcodes.insert(0x80, Opcode::new(Rc::new(Self::add), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE));
-        opcodes.insert(0x83, Opcode::new(Rc::new(Self::add), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
+        // ALU opcodes
+        let mut alu_opcodes: Vec<(Rc<dyn Fn(&mut CPU) -> usize>, u8)> = Vec::new();
+        alu_opcodes.push((Rc::new(Self::add), 0x00));
+        alu_opcodes.push((Rc::new(Self::sub), 0x28));
+        alu_opcodes.push((Rc::new(Self::xor), 0x30));
+        alu_opcodes.push((Rc::new(Self::and), 0x20));
+        alu_opcodes.push((Rc::new(Self::or), 0x08));
+        for (instruction, offset) in alu_opcodes.into_iter() {
+            opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, None, OpcodeFlags::NONE));
+            opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
+        }
+        opcodes.insert(0x80, Opcode::new(Rc::new(Self::alu_dispatch), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
 
         Self {
             ram,
@@ -160,6 +169,7 @@ impl CPU {
             src: None,
             dst: None,
             next_cycles: 0,
+            reg_bits: 0
         }
     }
 
@@ -246,6 +256,8 @@ impl CPU {
                                 self.dst = arg1;
                             }
                         }
+
+                        self.reg_bits = reg;
                     }
                 },
                 NumArgs::One => {
@@ -348,8 +360,14 @@ impl CPU {
             },
             DstArg::Ptr16(ptr) => {
                 match val_arg {
-                    SrcArg::Byte(val) => self.write_mem_byte(ptr, val),
+                    SrcArg::Byte(val) => self.write_mem_word(ptr, val as u16),
                     SrcArg::Word(val) => self.write_mem_word(ptr, val)
+                }
+            },
+            DstArg::Ptr8(ptr) => {
+                match val_arg {
+                    SrcArg::Byte(val) => self.write_mem_byte(ptr, val),
+                    SrcArg::Word(val) => self.write_mem_byte(ptr, val as u8)
                 }
             },
             _ => Err("Invalid dst arg")
@@ -358,7 +376,7 @@ impl CPU {
 
     fn translate_mod_rm(&mut self, mod_bits: u8, rm: u8, s: u8) -> Option<DstArg> {
         if mod_bits == 0b00 && rm == 0b110 {
-            Some(DstArg::Ptr16(self.read_ip_word()))
+            Some(if s == 1{ DstArg::Ptr16(self.read_ip_word()) } else { DstArg::Ptr8(self.read_ip_word()) })
         } else {
             let (reg1, reg2) = match rm {
                 0b000 => Some((Regs::BX, Some(Regs::SI))),
@@ -385,9 +403,9 @@ impl CPU {
                 }
             } else {
                 match mod_bits {
-                    0 => Some(DstArg::Ptr8(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value)),
-                    1 => Some(DstArg::Ptr8(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip() as u16))),
-                    2 => Some(DstArg::Ptr8(self.regs.get(&Self::translate_reg16(rm).unwrap()).unwrap().value + (self.read_ip_word()))),
+                    0 => Some(DstArg::Ptr8(ptr_val)),
+                    1 => Some(DstArg::Ptr8(ptr_val + (self.read_ip() as u16))),
+                    2 => Some(DstArg::Ptr8(ptr_val + (self.read_ip_word()))),
                     3 => Some(Self::reg_to_arg(rm, s)),
                     _ => None
                 }

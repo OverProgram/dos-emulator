@@ -39,4 +39,13 @@ mod tests {
         computer.execute_next();
         assert_eq!(computer.read_reg(cpu::Regs::AX).unwrap(), 5);
     }
+
+    #[test]
+    fn test_sub() {
+        let code = vec![0x30, 0x80, 0x2e, 0x0, 0x0, 0x20];
+        let mut computer = cpu::CPU::new(code.len());
+        computer.load(code, 0);
+        computer.execute_next_from(1);
+        assert_eq!(computer.read_mem(0), 0x10);
+    }
 }
