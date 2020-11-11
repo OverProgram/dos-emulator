@@ -372,7 +372,7 @@ impl CPU {
                 self.regs.get_mut(&Self::translate_reg16(reg).unwrap()).unwrap().value = if let SrcArg::Word(value) = val_arg {
                         value
                     } else {
-                        return Err("Mismatch oparend sizes");
+                        return Err("Mismatch operand sizes");
                     };
                 Ok(())
             },
@@ -382,7 +382,7 @@ impl CPU {
                 let value = if let SrcArg::Byte(val) = val_arg {
                     val
                 } else {
-                    return Err("Mismatch oparend sizes");
+                    return Err("Mismatch operand sizes");
                 };
                 match part {
                     WordPart::Low => { reg.set_low(value) },
@@ -584,12 +584,12 @@ impl CPU {
     }
 
     fn add_with_carry_16_bit(arg1: u16, arg2: u16) -> u16 {
-        let mut sum = ((arg1 as u32) + (arg2 as u32)) % 65535;
+        let sum = ((arg1 as u32) + (arg2 as u32)) % 65535;
         sum as u16
     }
 
     fn add_with_carry_8_bit(arg1: u8, arg2: u8) -> u8 {
-        let mut sum = ((arg1 as u16) + (arg2 as u16)) % 255;
+        let sum = ((arg1 as u16) + (arg2 as u16)) % 255;
         sum as u8
     }
 
