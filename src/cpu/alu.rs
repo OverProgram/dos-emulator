@@ -1,7 +1,8 @@
 use super::{CPU};
+use crate::cpu::SrcArg;
 
 impl CPU {
-    pub fn alu_dispatch(&mut self) -> usize {
+    pub fn alu_dispatch_two_args(&mut self) -> usize {
         match self.reg_bits {
             0b000 => self.add(),
             0b001 => self.or(),
@@ -12,13 +13,23 @@ impl CPU {
         }
     }
 
+    pub fn alu_dispatch_one_arg(&mut self) -> usize {
+        match self.reg_bits {
+            0b000 => self.inc(),
+            0b001 => self.dec(),
+            _ => 0
+        }
+    }
+
     pub fn add(&mut self) -> usize {
+        self.check_carry_add(self.src.clone().unwrap());
         let sum = self.operation_2_args(|src, dst| src + dst, |src, dst| src + dst);
         self.write_to_arg(self.dst.clone().unwrap(), sum);
         0
     }
 
     pub fn sub(&mut self) -> usize {
+        self.check_carry_sub(self.src.clone().unwrap());
         let dif = self.operation_2_args(|src, dst| dst - src, |src, dst| dst - src);
         self.write_to_arg(self.dst.clone().unwrap(), dif);
         0
@@ -43,13 +54,17 @@ impl CPU {
     }
 
 
-    pub fn inc(&mut self) {
-        let sum = self.operation_1_arg(|dst| dst + 1, |dst| dst + 1);
+    pub fn inc(&mut self) -> usize {
+        self.check_carry_add(SrcArg::Byte(1));
+        let sum = self.operation_1_arg(|dst| Self::add_with_carry_8_bit(dst, 1), |dst| Self::add_with_carry_16_bit(dst, 1));
         self.write_to_arg(self.dst.clone().unwrap(), sum);
+        0
     }
 
-    pub fn dec(&mut self) {
-        let sum = self.operation_1_arg(|dst| dst - 1, |dst| dst - 1);
+    pub fn dec(&mut self) -> usize {
+        self.check_carry_sub(SrcArg::Byte(1));
+        let sum = self.operation_1_arg(|dst| Self::sub_with_carry_8_bit(dst, 1), |dst| Self::sub_with_carry_16_bit(dst, 1));
         self.write_to_arg(self.dst.clone().unwrap(), sum);
+        0
     }
 }

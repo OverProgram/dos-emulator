@@ -8,9 +8,23 @@ use std::rc::Rc;
 struct OpcodeFlags;
 
 impl OpcodeFlags {
-    const NONE : u32 = 0;
+    const NONE: u32 = 0;
     const IMMEDIATE: u32 = 0x01;
     const SIZE_MISMATCH: u32 = 0x02;
+}
+
+struct CPUFlags ;
+
+impl CPUFlags {
+    const CARRY: u16 = 0x0000;
+    const PARITY: u16 = 0x0040;
+    const AUX_CARRY: u16 = 0x0010;
+    const ZERO: u16 = 0x0040;
+    const SIGN: u16 = 0x0080;
+    const TRAP: u16 = 0x0100;
+    const INTERRUPT: u16 = 0x0200;
+    const DIRECTION: u16 = 0x0400;
+    const OVERFLOW: u16 = 0x0800;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -68,7 +82,8 @@ pub enum Regs {
     CS,
     SS,
     DS,
-    IP
+    IP,
+    FLAGS
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -136,6 +151,7 @@ impl CPU {
         regs.insert(Regs::SS, reg::Reg::new());
         regs.insert(Regs::CS, reg::Reg::new());
         regs.insert(Regs::IP, reg::Reg::new());
+        regs.insert(Regs::FLAGS, reg::Reg::new());
 
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
@@ -158,8 +174,13 @@ impl CPU {
             opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, None, OpcodeFlags::NONE));
             opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
         }
-        opcodes.insert(0x80, Opcode::new(Rc::new(Self::alu_dispatch), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE));
-        opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
+        opcodes.insert(0x80, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE));
+        for x in 0..7 {
+            opcodes.insert(0x40 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), OpcodeFlags::NONE));
+            opcodes.insert(0x48 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), OpcodeFlags::NONE));
+        }
+        opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
+        opcodes.insert(0xFE, Opcode::new(Rc::new(Self::alu_dispatch_one_arg), NumArgs::One, 1, None, OpcodeFlags::NONE));
 
         Self {
             ram,
@@ -187,7 +208,10 @@ impl CPU {
             let mut s = (code & 0x01) >> 0;
             let opcode = match self.opcodes.get(&code) {
                 Some(opcode) => opcode,
-                None => self.opcodes.get(&(code & 0xFC)).unwrap()
+                None => match self.opcodes.get(&(code & 0xFE)) {
+                    Some(opcode) => opcode,
+                    None => self.opcodes.get(&(code & 0xFC)).unwrap()
+                }
             };
             self.instruction = Some(opcode.clone());
             self.next_cycles += opcode.cycles;
@@ -207,11 +231,18 @@ impl CPU {
                 if let Some(arg) = arg2 {
                     arg2_translated = Some(self.translate_placeholder(arg, s));
                 }
-                if d == 1 && !immediate {
-                    self.src = self.get_src_arg(arg1_translated.unwrap());
+                let one_arg = if let NumArgs::Two = num_args { false } else { true };
+                if d == 1 && !immediate && !one_arg {
+                    self.src = match arg1_translated {
+                        Some(arg) => self.get_src_arg(arg),
+                        None => None
+                    };
                     self.dst = arg2_translated;
                 } else {
-                    self.src = self.get_src_arg(arg2_translated.unwrap());
+                    self.src = match arg2_translated {
+                        Some(arg) => self.get_src_arg(arg),
+                        None => None
+                    };
                     self.dst = arg1_translated;
                 }
             }
@@ -241,7 +272,7 @@ impl CPU {
                             Some(Self::reg_to_arg(reg, s))
                         };
 
-                        if d == 1 || immediate {
+                        if d == 0 || immediate {
                             if let None = self.src {
                                 self.src = self.get_src_arg(arg1.unwrap());
                             }
@@ -266,6 +297,7 @@ impl CPU {
                     let mod_bits = (mod_reg_rm & 0xC0) >> 6;
                     let arg = self.translate_mod_rm(mod_bits, rm, s);
                     self.dst = arg;
+                    self.reg_bits = (mod_reg_rm & 0x38) >> 3;
                 },
                 NumArgs::Zero => ()
             }
@@ -491,6 +523,90 @@ impl CPU {
                 }
             }
         }.unwrap()
+    }
+
+    fn check_carry_add(&mut self, arg: SrcArg) {
+        match arg {
+            SrcArg::Word(src) => {
+                if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                    self.check_carry_16_bit(src, dst);
+                }
+            },
+            SrcArg::Byte(src) => {
+                if let SrcArg::Byte(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                    self.check_carry_8_bit(src, dst);
+                } else if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                    self.check_carry_16_bit(src as u16, dst);
+                }
+            }
+        };
+    }
+
+    fn twos_compliment_word(arg: u16) -> u16 {
+        Self::add_with_carry_16_bit(!arg, 1)
+    }
+
+    fn twos_compliment_byte(arg: u8) -> u8 {
+        Self::add_with_carry_8_bit(!arg, 1)
+    }
+
+    fn check_carry_sub(&mut self, arg: SrcArg) {
+        match arg {
+            SrcArg::Word(src) => {
+                if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                    self.check_carry_16_bit(dst, Self::twos_compliment_word(src));
+                }
+            },
+            SrcArg::Byte(src) => {
+                if let SrcArg::Byte(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                    self.check_carry_8_bit(dst, Self::twos_compliment_byte(src));
+                } else if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                    self.check_carry_16_bit(dst, Self::twos_compliment_word(src as u16));
+                }
+            }
+        };
+    }
+
+    fn check_carry_16_bit(&mut self, arg1: u16, arg2: u16) {
+        if (arg1 as u32) + (arg2 as u32) > 65535 {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::CARRY;
+        } else {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !CPUFlags::CARRY;
+        }
+    }
+
+    fn check_carry_8_bit(&mut self, arg1: u8, arg2: u8) {
+        if (arg1 as u16) + (arg2 as u16) > 255 {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::CARRY;
+        } else {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !CPUFlags::CARRY;
+        }
+    }
+
+    fn add_with_carry_16_bit(arg1: u16, arg2: u16) -> u16 {
+        let mut sum = ((arg1 as u32) + (arg2 as u32)) % 65535;
+        sum as u16
+    }
+
+    fn add_with_carry_8_bit(arg1: u8, arg2: u8) -> u8 {
+        let mut sum = ((arg1 as u16) + (arg2 as u16)) % 255;
+        sum as u8
+    }
+
+    fn sub_with_carry_16_bit(arg1: u16, arg2: u16) -> u16 {
+        let mut sum = (arg1 as i32) - (arg2 as i32);
+        if sum < 0 {
+            sum += 65535;
+        }
+        sum as u16
+    }
+
+    fn sub_with_carry_8_bit( arg1: u8, arg2: u8) -> u8 {
+        let mut sum = (arg1 as i16) - (arg2 as i16);
+        if sum < 0 {
+            sum += 255;
+        }
+        sum as u8
     }
 
     fn reg_to_arg(reg: u8, s: u8) -> DstArg {
