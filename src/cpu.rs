@@ -13,18 +13,18 @@ impl OpcodeFlags {
     const SIZE_MISMATCH: u32 = 0x02;
 }
 
-struct CPUFlags ;
+pub struct CPUFlags ;
 
 impl CPUFlags {
-    const CARRY: u16 = 0x0000;
-    const PARITY: u16 = 0x0040;
-    const AUX_CARRY: u16 = 0x0010;
-    const ZERO: u16 = 0x0040;
-    const SIGN: u16 = 0x0080;
-    const TRAP: u16 = 0x0100;
-    const INTERRUPT: u16 = 0x0200;
-    const DIRECTION: u16 = 0x0400;
-    const OVERFLOW: u16 = 0x0800;
+    pub const CARRY: u16 = 0x0001;
+    pub const PARITY: u16 = 0x0040;
+    pub const AUX_CARRY: u16 = 0x0010;
+    pub const ZERO: u16 = 0x0040;
+    pub const SIGN: u16 = 0x0080;
+    pub const TRAP: u16 = 0x0100;
+    pub const INTERRUPT: u16 = 0x0200;
+    pub const DIRECTION: u16 = 0x0400;
+    pub const OVERFLOW: u16 = 0x0800;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -57,15 +57,6 @@ enum Placeholder {
     Reg(u8),
     Imm,
     Ptr
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum AddressingMode {
-    Immediate,
-    Direct,
-    Indirect,
-    IndirectIndex,
-    Relative
 }
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
@@ -417,6 +408,7 @@ impl CPU {
                 0b011 => Some((Regs::BP, Some(Regs::DI))),
                 0b100 => Some((Regs::SI, None)),
                 0b101 => Some((Regs::DI, None)),
+                0b110 => Some((Regs::BP, None)),
                 0b111 => Some((Regs::BX, None)),
                 _ => None
             }.unwrap();
@@ -542,6 +534,21 @@ impl CPU {
         };
     }
 
+    fn check_zero(&mut self, result: &SrcArg) {
+        if Self::check_src_arg(result, 0) {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::ZERO;
+        } else {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !CPUFlags::ZERO;
+        }
+    }
+
+    fn check_src_arg(arg: &SrcArg, eq: u16) -> bool {
+        match arg {
+            SrcArg::Byte(val) => *val == eq as u8,
+            SrcArg::Word(val) => *val == eq
+        }
+    }
+
     fn twos_compliment_word(arg: u16) -> u16 {
         Self::add_with_carry_16_bit(!arg, 1)
     }
@@ -584,19 +591,19 @@ impl CPU {
     }
 
     fn add_with_carry_16_bit(arg1: u16, arg2: u16) -> u16 {
-        let sum = ((arg1 as u32) + (arg2 as u32)) % 65535;
+        let sum = ((arg1 as u32) + (arg2 as u32)) % 65536;
         sum as u16
     }
 
     fn add_with_carry_8_bit(arg1: u8, arg2: u8) -> u8 {
-        let sum = ((arg1 as u16) + (arg2 as u16)) % 255;
+        let sum = ((arg1 as u16) + (arg2 as u16)) % 256;
         sum as u8
     }
 
     fn sub_with_carry_16_bit(arg1: u16, arg2: u16) -> u16 {
         let mut sum = (arg1 as i32) - (arg2 as i32);
         if sum < 0 {
-            sum += 65535;
+            sum += 65536;
         }
         sum as u16
     }
@@ -604,7 +611,7 @@ impl CPU {
     fn sub_with_carry_8_bit( arg1: u8, arg2: u8) -> u8 {
         let mut sum = (arg1 as i16) - (arg2 as i16);
         if sum < 0 {
-            sum += 255;
+            sum += 256;
         }
         sum as u8
     }
