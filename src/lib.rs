@@ -1,4 +1,4 @@
-mod cpu;
+pub mod cpu;
 
 #[cfg(test)]
 mod tests {

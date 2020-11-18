@@ -349,7 +349,7 @@ impl CPU {
     }
 
     fn write_mem_word(&mut self, ptr: u16, val: u16) -> Result<(), &str> {
-        self.write_mem_byte(ptr, (val & 0x00FF) as u8);
+        self.write_mem_byte(ptr, (val & 0x00FF) as u8).unwrap();
         self.write_mem_byte(ptr, ((ptr & 0xFF00) >> 8) as u8)
     }
 
