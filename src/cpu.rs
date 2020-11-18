@@ -459,26 +459,6 @@ impl CPU {
         }
     }
 
-    fn get_reg_high(&self, num: u8) -> u8 {
-        let reg = self.regs.get(&Self::translate_reg16(num % 4).unwrap()).unwrap();
-        reg.get_high()
-    }
-
-    fn get_reg_low(&self, num: u8) -> u8 {
-        let reg = self.regs.get(&Self::translate_reg16(num % 4).unwrap()).unwrap();
-        reg.get_low()
-    }
-
-    fn set_reg_high(&mut self, num: u8, val: u8) {
-        let reg = self.regs.get_mut(&Self::translate_reg16(num % 4).unwrap()).unwrap();
-        reg.set_high(val);
-    }
-
-    fn set_reg_low(&mut self, num: u8, val: u8) {
-        let reg = self.regs.get_mut(&Self::translate_reg16(num % 4).unwrap()).unwrap();
-        reg.set_low(val);
-    }
-
     fn operation_1_arg<T, U>(&mut self, byte: T, word: U) -> SrcArg where
         T: Fn(u8)-> u8,
         U: Fn(u16) -> u16
