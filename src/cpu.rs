@@ -172,6 +172,7 @@ impl CPU {
         }
         opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
         opcodes.insert(0xFE, Opcode::new(Rc::new(Self::alu_dispatch_one_arg), NumArgs::One, 1, None, OpcodeFlags::NONE));
+        opcodes.insert(0xF6, Opcode::new(Rc::new(Self::mul_dispatch), NumArgs::One, 1, None, OpcodeFlags::NONE));
 
         Self {
             ram,
