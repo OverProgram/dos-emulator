@@ -102,7 +102,7 @@ impl CPU {
 
     fn set_overflow(&mut self, result_high: u16) {
         if result_high == 0 {
-            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= (CPUFlags::CARRY | CPUFlags::OVERFLOW);
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::CARRY | CPUFlags::OVERFLOW;
         } else {
             self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !(CPUFlags::CARRY | CPUFlags::OVERFLOW);
         }
@@ -118,9 +118,9 @@ impl CPU {
                 (((val as u32) * (operand as u32)) as u16, (((val as u32) * (operand as u32)) >> 16) as u16, false)
             }
         };
-        self.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_low));
+        self.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_low)).unwrap();
         if is_word {
-            self.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_high));
+            self.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_high)).unwrap();
             self.set_overflow(result_high)
         }
         0
@@ -136,9 +136,9 @@ impl CPU {
                 (((val as i32) * (operand as i32)) as i16, (((val as i32) * (operand as i32)) >> 16) as i16, false)
             }
         };
-        self.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_low as u16));
+        self.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_low as u16)).unwrap();
         if is_word {
-            self.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_high as u16));
+            self.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_high as u16)).unwrap();
             self.set_overflow(result_high as u16);
         }
         0
@@ -151,14 +151,14 @@ impl CPU {
                 let result_div = (operand / (val as u16)) as u8;
                 let result_mod = (operand % (val as u16)) as u8;
                 let result = SrcArg::Word((result_div as u16) | ((result_mod as u16) << 8));
-                self.write_to_arg(DstArg::Reg16(0), result);
+                self.write_to_arg(DstArg::Reg16(0), result).unwrap();
             },
             SrcArg::Word(val) => {
-                let operand = (self.get_reg_16(0).unwrap() as u32) | ((self.get_reg_16(2).unwrap() << 16) as u32);
+                let operand = (self.get_reg_16(0).unwrap() as u32) | ((self.get_reg_16(2).unwrap() as u32) << 16);
                 let result_div = (operand / (val as u32)) as u16;
                 let result_mod = (operand % (val as u32)) as u16;
-                self.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div));
-                self.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod));
+                self.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div)).unwrap();
+                self.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod)).unwrap();
             }
         };
         0
@@ -167,18 +167,18 @@ impl CPU {
     pub fn idiv(&mut self) -> usize {
         match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Byte(val) => {
-                let operand = self.get_reg_16(0).unwrap();
+                let operand = self.get_reg_16(0).unwrap() as i16;
                 let result_div = (operand / (val as i16)) as i8;
                 let result_mod = (operand % (val as i16)) as i8;
                 let result = SrcArg::Word(((result_div as i16) | ((result_mod as i16) << 8)) as u16);
-                self.write_to_arg(DstArg::Reg16(0), result);
+                self.write_to_arg(DstArg::Reg16(0), result).unwrap();
             },
             SrcArg::Word(val) => {
-                let operand = (self.get_reg_16(0).unwrap() as i32) | ((self.get_reg_16(2).unwrap() << 16) as i32);
+                let operand = (self.get_reg_16(0).unwrap() as i32) | ((self.get_reg_16(2).unwrap() as i32) << 16);
                 let result_div = (operand / (val as i32)) as u16;
                 let result_mod = (operand % (val as i32)) as u16;
-                self.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div));
-                self.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod));
+                self.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div)).unwrap();
+                self.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod)).unwrap();
             }
         };
         0

@@ -101,4 +101,25 @@ mod tests {
         computer.execute_next_from(1);
         assert_eq!(computer.read_reg(Regs::FLAGS).unwrap() & (cpu::CPUFlags::CARRY | cpu::CPUFlags::ZERO), (cpu::CPUFlags::CARRY | cpu::CPUFlags::ZERO));
     }
+
+    #[test]
+    fn test_mul() {
+        let mut computer = new_cpu_vec(vec![0xb8, 0x55, 0x0, 0xbb, 0xaa, 0x0, 0xf7, 0xe3]);
+        computer.execute_next();
+        computer.execute_next();
+        computer.execute_next();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x3872);
+        assert_eq!(computer.read_reg(Regs::DX).unwrap(), 0x00);
+    }
+
+    #[test]
+    fn test_div() {
+        let mut computer = new_cpu_vec(vec![0xba, 0xaa, 0x00, 0xb8, 0x55, 0x55, 0xbb, 0xff, 0x00, 0xf7, 0xfb]);
+        computer.execute_next();
+        computer.execute_next();
+        computer.execute_next();
+        computer.execute_next();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0xab00);
+        assert_eq!(computer.read_reg(Regs::DX).unwrap(), 0x0055);
+    }
 }
