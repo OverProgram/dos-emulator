@@ -14,7 +14,7 @@ should_continue = True
 
 
 def generate_code():
-    code = ".code16\n.text\n"
+    code = ".code16\n.intel_syntax noprefix\n.text\n"
     for line in lines:
         code += "{}\n".format(line)
     return code
