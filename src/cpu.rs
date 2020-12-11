@@ -182,7 +182,7 @@ impl CPU {
             opcodes.insert(0x50 + x, Opcode::new(Rc::new(Self::push), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
             opcodes.insert(0x58 + x, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
         }
-        opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE);
+        opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
 
         Self {
             ram,
@@ -222,7 +222,7 @@ impl CPU {
             self.seg = if let None = seg {
                 opcode.segment
             } else {
-                seg
+                seg.unwrap()
             };
             let immediate = opcode.has_flag(OpcodeFlags::IMMEDIATE).unwrap();
             let size_mismatch = opcode.has_flag(OpcodeFlags::SIZE_MISMATCH).unwrap();
@@ -348,7 +348,7 @@ impl CPU {
             None
         } else {
             self.next_cycles += 1;
-            Some(self.ram[Self::physical_address(self.read_reg(self.seg).unwrap(), ptr)])
+            Some(self.ram[Self::physical_address(self.read_reg(self.seg).unwrap(), ptr) as usize])
         }
     }
 
@@ -360,7 +360,8 @@ impl CPU {
         if ptr > self.ram.len() as u16 {
             Err("Write out of bounds")
         } else {
-            self.ram[Self::physical_address(self.read_reg(self.seg).unwrap(), ptr)] = (val & 0xFF) as u8;
+            let seg_val = self.read_reg(self.seg).unwrap();
+            self.ram[Self::physical_address(seg_val, ptr) as usize] = (val & 0xFF) as u8;
             self.next_cycles += 1;
             Ok(())
         }
@@ -376,7 +377,7 @@ impl CPU {
             None
         } else {
             self.next_cycles += 1;
-            Some(self.ram[Self::physical_address(self.read_reg(seg).unwrap(), ptr)])
+            Some(self.ram[Self::physical_address(self.read_reg(seg).unwrap(), ptr) as usize])
         }
     }
 
@@ -388,7 +389,8 @@ impl CPU {
         if ptr > self.ram.len() as u16 {
             Err("Write out of bounds")
         } else {
-            self.ram[Self::physical_address(self.read_reg(seg).unwrap(), ptr)] = (val & 0xFF) as u8;
+            let seg_val = self.read_reg(seg).unwrap();
+            self.ram[Self::physical_address(seg_val, ptr) as usize] = (val & 0xFF) as u8;
             self.next_cycles += 1;
             Ok(())
         }
@@ -681,11 +683,12 @@ impl CPU {
     }
 
     pub fn set_reg(&mut self, reg: Regs, val: u16) {
-        self.regs.set_mut(&reg).unwrap().value = val
+        self.regs.get_mut(&reg).unwrap().value = val
     }
 
     pub fn get_mem_seg(&self, seg: Regs, loc: u16) -> u8 {
-        self.ram[Self::physical_address(self.read_reg(seg).unwrap(), loc)]
+        let seg_val = self.read_reg(seg).unwrap();
+        self.ram[Self::physical_address(seg_val, loc) as usize]
     }
 
     fn translate_reg16(num: u8) -> Option<Regs> {
@@ -707,6 +710,6 @@ impl CPU {
     }
 
     fn physical_address(seg: u16, offset: u16) -> u32 {
-        ((seg << 4) as u32) + offset
+        ((seg << 4) as u32) + (offset as u32)
     }
 }
