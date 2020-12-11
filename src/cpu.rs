@@ -1,6 +1,7 @@
 mod reg;
 mod mem;
 mod alu;
+mod stack;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -176,6 +177,12 @@ impl CPU {
         opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
         opcodes.insert(0xFE, Opcode::new(Rc::new(Self::alu_dispatch_one_arg), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
         opcodes.insert(0xF6, Opcode::new(Rc::new(Self::mul_dispatch), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
+        // Stack opcodes
+        for x in 0..7 {
+            opcodes.insert(0x50 + x, Opcode::new(Rc::new(Self::push), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
+            opcodes.insert(0x58 + x, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
+        }
+        opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE);
 
         Self {
             ram,
@@ -362,6 +369,34 @@ impl CPU {
     fn write_mem_word(&mut self, ptr: u16, val: u16) -> Result<(), &str> {
         self.write_mem_byte(ptr, (val & 0x00FF) as u8).unwrap();
         self.write_mem_byte(ptr, ((ptr & 0xFF00) >> 8) as u8)
+    }
+
+    fn read_mem_byte_seg(&mut self, ptr: u16, seg: Regs) -> Option<u8> {
+        if ptr > self.ram.len() as u16 {
+            None
+        } else {
+            self.next_cycles += 1;
+            Some(self.ram[Self::physical_address(self.read_reg(seg).unwrap(), ptr)])
+        }
+    }
+
+    fn read_mem_word_seg(&mut self, ptr: u16, seg: Regs) -> Option<u16> {
+        Some((self.read_mem_byte_seg(ptr, seg)? as u16) | ((self.read_mem_byte_seg(ptr + 1, seg)? as u16) << 8))
+    }
+
+    fn write_mem_byte_seg(&mut self, ptr: u16, seg: Regs, val: u8) -> Result<(), &str> {
+        if ptr > self.ram.len() as u16 {
+            Err("Write out of bounds")
+        } else {
+            self.ram[Self::physical_address(self.read_reg(seg).unwrap(), ptr)] = (val & 0xFF) as u8;
+            self.next_cycles += 1;
+            Ok(())
+        }
+    }
+
+    fn write_mem_word_seg(&mut self, ptr: u16, seg: Regs, val: u16) -> Result<(), &str> {
+        self.write_mem_byte_seg(ptr, seg, (val & 0x00FF) as u8).unwrap();
+        self.write_mem_byte_seg(ptr, seg, ((ptr & 0xFF00) >> 8) as u8)
     }
 
     fn read_ip_word(&mut self) -> u16 {
@@ -649,7 +684,7 @@ impl CPU {
         self.regs.set_mut(&reg).unwrap().value = val
     }
 
-    pub fn read_mem_seg(&self, seg: Regs, loc: u16) -> u8 {
+    pub fn get_mem_seg(&self, seg: Regs, loc: u16) -> u8 {
         self.ram[Self::physical_address(self.read_reg(seg).unwrap(), loc)]
     }
 

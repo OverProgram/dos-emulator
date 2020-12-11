@@ -17,6 +17,7 @@ impl CPU {
         match self.reg_bits {
             0b000 => self.inc(),
             0b001 => self.dec(),
+            0b110 => self.push(),
             _ => 0
         }
     }
