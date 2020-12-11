@@ -19,16 +19,18 @@ fn new_cpu_from_file(filename: &str) -> cpu::CPU {
     computer
 }
 
+fn new_cpu_vec(code: Vec<u8>) -> cpu::CPU {
+    let mut computer = cpu::CPU::new(code.len());
+    computer.load(code, 0);
+    computer
+}
+
 #[cfg(test)]
-mod tests {
+mod mov_test {
     use super::cpu;
     use crate::cpu::Regs;
+    use crate::new_cpu_vec;
 
-    fn new_cpu_vec(code: Vec<u8>) -> cpu::CPU {
-        let mut computer = cpu::CPU::new(code.len());
-        computer.load(code, 0);
-        computer
-    }
 
     #[test]
     fn test_mov_reg_shorthand() {
@@ -56,6 +58,13 @@ mod tests {
         computer.execute_next_from(1);
         assert_eq!(computer.read_mem(0), 0x55);
     }
+}
+
+#[cfg(test)]
+mod test_alu {
+    use super::cpu;
+    use crate::cpu::Regs;
+    use crate::new_cpu_vec;
 
     #[test]
     fn test_add() {
@@ -140,5 +149,18 @@ mod tests {
         computer.execute_next();
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0xab00);
         assert_eq!(computer.read_reg(Regs::DX).unwrap(), 0x0055);
+    }
+}
+
+#[cfg(test)]
+mod stack_test {
+    #[test]
+    fn test_push() {
+
+    }
+
+    #[test]
+    fn test_pop() {
+
     }
 }
