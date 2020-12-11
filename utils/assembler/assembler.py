@@ -57,6 +57,27 @@ def dump():
     lines = []
 
 
+def load(filename):
+    try:
+        f = open(filename, 'r')
+        lines.extend(f)
+    except FileNotFoundError:
+        print('Error: {} does not exist'.format(filename))
+
+
+def save(filename):
+    global lines
+    try:
+        f = open(filename, 'wb')
+        code = compile_code(generate_code())
+        if code is not None:
+            f.write(code)
+    except FileNotFoundError:
+        print('Error: {} does not exist'.format(filename))
+    finally:
+        lines = []
+
+
 def stop_loop():
     global should_continue
     should_continue = False
@@ -64,6 +85,8 @@ def stop_loop():
 
 keywords = {
     "dump": dump,
+    "save": save,
+    "load": load,
     "quit": stop_loop
 }
 
@@ -72,8 +95,8 @@ def main():
     i = 0
     while should_continue:
         line = input("In[{}]: ".format(i))
-        if line in keywords.keys():
-            keywords[line]()
+        if line.split(' ')[0] in keywords.keys():
+            keywords[line.split(' ')[0]](*line.split(' ')[1:])
         else:
             lines.append(line)
         i += 1
