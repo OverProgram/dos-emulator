@@ -206,7 +206,7 @@ impl CPU {
             self.src = None;
             self.dst = None;
         } else {
-            let mut seg: Option<Regs> = None;
+            let seg: Option<Regs> = None;
             let code = self.read_ip();
             let d = (code & 0x02) >> 1;
             let mut s = (code & 0x01) >> 0;

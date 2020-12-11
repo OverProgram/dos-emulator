@@ -30,9 +30,6 @@ fn new_cpu_vec(code: Vec<u8>) -> cpu::CPU {
 #[cfg(test)]
 mod mov_test {
     use super::cpu;
-    use crate::cpu::Regs;
-    use crate::new_cpu_vec;
-
 
     #[test]
     fn test_mov_reg_shorthand() {
@@ -156,7 +153,6 @@ mod test_alu {
 
 #[cfg(test)]
 mod stack_test {
-    use super::cpu;
     use crate::cpu::Regs;
     use crate::{new_cpu_from_file};
 
