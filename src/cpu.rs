@@ -301,12 +301,14 @@ impl CPU {
                     }
                 },
                 NumArgs::One => {
-                    let mod_reg_rm = self.read_ip();
-                    let rm = (mod_reg_rm & 0x07) >> 0;
-                    let mod_bits = (mod_reg_rm & 0xC0) >> 6;
-                    let arg = self.translate_mod_rm(mod_bits, rm, s);
-                    self.dst = arg;
-                    self.reg_bits = (mod_reg_rm & 0x38) >> 3;
+                    if let None = self.dst {
+                        let mod_reg_rm = self.read_ip();
+                        let rm = (mod_reg_rm & 0x07) >> 0;
+                        let mod_bits = (mod_reg_rm & 0xC0) >> 6;
+                        let arg = self.translate_mod_rm(mod_bits, rm, s);
+                        self.dst = arg;
+                        self.reg_bits = (mod_reg_rm & 0x38) >> 3;
+                    }
                 },
                 NumArgs::Zero => ()
             }
@@ -314,7 +316,8 @@ impl CPU {
     }
 
     fn read_ip(&mut self) -> u8 {
-        let val = self.ram[self.regs.get(&Regs::IP).unwrap().value as usize];
+        let addr = Self::physical_address(self.regs.get(&Regs::CS).unwrap().value, self.regs.get(&Regs::IP).unwrap().value);
+        let val = self.ram[addr as usize];
         self.regs.get_mut(&Regs::IP).unwrap().value += 1;
         self.next_cycles += 1;
         val
@@ -369,7 +372,7 @@ impl CPU {
 
     fn write_mem_word(&mut self, ptr: u16, val: u16) -> Result<(), &str> {
         self.write_mem_byte(ptr, (val & 0x00FF) as u8).unwrap();
-        self.write_mem_byte(ptr, ((ptr & 0xFF00) >> 8) as u8)
+        self.write_mem_byte(ptr + 1, ((val & 0xFF00) >> 8) as u8)
     }
 
     fn read_mem_byte_seg(&mut self, ptr: u16, seg: Regs) -> Option<u8> {
@@ -667,12 +670,11 @@ impl CPU {
         for i in 0..data.len() {
             self.ram[loc + i] = data[i];
         }
-        self.regs.get_mut(&Regs::IP).unwrap().value = loc as u16;
     }
 
     pub fn execute_next(&mut self) {
         self.step();
-        while match self.instruction { Some(_) => true, None => false } {
+        while match self.instruction { Some(_) => true, None => false } || self.next_cycles > 0 {
             self.step();
         }
     }
@@ -710,6 +712,6 @@ impl CPU {
     }
 
     fn physical_address(seg: u16, offset: u16) -> u32 {
-        ((seg << 4) as u32) + (offset as u32)
+        ((seg as u32) << 4) + (offset as u32)
     }
 }

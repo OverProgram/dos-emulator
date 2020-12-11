@@ -6,15 +6,17 @@ pub mod cpu;
 
 fn new_cpu_from_file(filename: &str) -> cpu::CPU {
     let mut computer = cpu::CPU::new(0x7FFFFF);
-    computer.set_reg(cpu::Regs::SS, 0x3F);
+    computer.set_reg(cpu::Regs::SS, 0x003F);
     computer.set_reg(cpu::Regs::CS, 0x103F);
     computer.set_reg(cpu::Regs::DS, 0x203F);
+    computer.set_reg(cpu::Regs::SP, 0xFFFF);
+    computer.set_reg(cpu::Regs::IP, 0x0000);
 
     let mut f = File::open(&filename).expect("No file found!");
     let metadata = fs::metadata(&filename).expect("No file found!");
     let mut buffer = vec![0; metadata.len() as usize];
     f.read(&mut buffer).expect("Couldn't read file!");
-    computer.load(buffer, 0x103FC);
+    computer.load(buffer, 0x103F0);
 
     computer
 }
@@ -154,13 +156,26 @@ mod test_alu {
 
 #[cfg(test)]
 mod stack_test {
+    use super::cpu;
+    use crate::cpu::Regs;
+    use crate::{new_cpu_from_file};
+
     #[test]
     fn test_push() {
-
+        let mut computer = new_cpu_from_file("tests/objects/push.out");
+        computer.execute_next();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x05);
+        computer.execute_next();
+        assert_eq!(computer.read_reg(Regs::SP).unwrap(), 0xFFFD);
+        assert_eq!(computer.get_mem_seg(Regs::SS, computer.read_reg(Regs::SP).unwrap() + 1), 0x05);
     }
 
     #[test]
     fn test_pop() {
-
+        let mut computer = new_cpu_from_file("tests/objects/pop.out");
+        computer.execute_next();
+        computer.execute_next();
+        computer.execute_next();
+        assert_eq!(computer.read_reg(Regs::BX).unwrap(), 0x05);
     }
 }
