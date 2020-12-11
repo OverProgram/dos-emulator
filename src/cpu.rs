@@ -89,17 +89,19 @@ struct Opcode {
     num_args: NumArgs,
     cycles: usize,
     shorthand: Option<(Placeholder, Option<Placeholder>)>,
-    flags: u32
+    flags: u32,
+    segment: Regs
 }
 
 impl Opcode {
-    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, flags: u32) -> Self {
+    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, segment: Regs, flags: u32) -> Self {
         Self {
             instruction,
             num_args,
             cycles,
             shorthand,
-            flags
+            flags,
+            segment
         }
     }
 
@@ -118,6 +120,7 @@ pub struct CPU {
     instruction: Option<Opcode>,
     src: Option<SrcArg>,
     dst: Option<DstArg>,
+    seg: Regs,
     next_cycles: usize,
     reg_bits: u8
 }
@@ -147,13 +150,13 @@ impl CPU {
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
         // Move opcodes
-        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, OpcodeFlags::NONE));
-        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), OpcodeFlags::NONE));
+        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::NONE));
+        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), Regs::DS, OpcodeFlags::NONE));
         for x in 0..7 {
-            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
-            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
+            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))),Regs::DS, OpcodeFlags::IMMEDIATE));
+            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::IMMEDIATE));
         }
-        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE));
         // ALU opcodes
         let mut alu_opcodes: Vec<(Rc<dyn Fn(&mut CPU) -> usize>, u8)> = Vec::new();
         alu_opcodes.push((Rc::new(Self::add), 0x00));
@@ -162,17 +165,17 @@ impl CPU {
         alu_opcodes.push((Rc::new(Self::and), 0x20));
         alu_opcodes.push((Rc::new(Self::or), 0x08));
         for (instruction, offset) in alu_opcodes.into_iter() {
-            opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, None, OpcodeFlags::NONE));
-            opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), OpcodeFlags::IMMEDIATE));
+            opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::NONE));
+            opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::IMMEDIATE));
         }
-        opcodes.insert(0x80, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0x80, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE));
         for x in 0..7 {
-            opcodes.insert(0x40 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), OpcodeFlags::NONE));
-            opcodes.insert(0x48 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), OpcodeFlags::NONE));
+            opcodes.insert(0x40 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
+            opcodes.insert(0x48 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
         }
-        opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
-        opcodes.insert(0xFE, Opcode::new(Rc::new(Self::alu_dispatch_one_arg), NumArgs::One, 1, None, OpcodeFlags::NONE));
-        opcodes.insert(0xF6, Opcode::new(Rc::new(Self::mul_dispatch), NumArgs::One, 1, None, OpcodeFlags::NONE));
+        opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
+        opcodes.insert(0xFE, Opcode::new(Rc::new(Self::alu_dispatch_one_arg), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
+        opcodes.insert(0xF6, Opcode::new(Rc::new(Self::mul_dispatch), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
 
         Self {
             ram,
@@ -181,6 +184,7 @@ impl CPU {
             instruction: None,
             src: None,
             dst: None,
+            seg: Regs::DS,
             next_cycles: 0,
             reg_bits: 0
         }
@@ -195,6 +199,7 @@ impl CPU {
             self.src = None;
             self.dst = None;
         } else {
+            let mut seg: Option<Regs> = None;
             let code = self.read_ip();
             let d = (code & 0x02) >> 1;
             let mut s = (code & 0x01) >> 0;
@@ -207,6 +212,11 @@ impl CPU {
             };
             self.instruction = Some(opcode.clone());
             self.next_cycles += opcode.cycles;
+            self.seg = if let None = seg {
+                opcode.segment
+            } else {
+                seg
+            };
             let immediate = opcode.has_flag(OpcodeFlags::IMMEDIATE).unwrap();
             let size_mismatch = opcode.has_flag(OpcodeFlags::SIZE_MISMATCH).unwrap();
             let num_args = opcode.num_args;
@@ -331,7 +341,7 @@ impl CPU {
             None
         } else {
             self.next_cycles += 1;
-            Some(self.ram[ptr as usize])
+            Some(self.ram[Self::physical_address(self.read_reg(self.seg).unwrap(), ptr)])
         }
     }
 
@@ -343,7 +353,7 @@ impl CPU {
         if ptr > self.ram.len() as u16 {
             Err("Write out of bounds")
         } else {
-            self.ram[ptr as usize] = (val & 0xFF) as u8;
+            self.ram[Self::physical_address(self.read_reg(self.seg).unwrap(), ptr)] = (val & 0xFF) as u8;
             self.next_cycles += 1;
             Ok(())
         }
@@ -635,6 +645,14 @@ impl CPU {
         self.execute_next();
     }
 
+    pub fn set_reg(&mut self, reg: Regs, val: u16) {
+        self.regs.set_mut(&reg).unwrap().value = val
+    }
+
+    pub fn read_mem_seg(&self, seg: Regs, loc: u16) -> u8 {
+        self.ram[Self::physical_address(self.read_reg(seg).unwrap(), loc)]
+    }
+
     fn translate_reg16(num: u8) -> Option<Regs> {
         match num {
             0 => Some(Regs::AX),
@@ -651,5 +669,9 @@ impl CPU {
 
     fn translate_reg8(num: u8) -> Option<(Regs, WordPart)> {
         Some((Self::translate_reg16(num % 4)?, if num / 2 == 0 { WordPart::Low } else { WordPart::High }))
+    }
+
+    fn physical_address(seg: u16, offset: u16) -> u32 {
+        ((seg << 4) as u32) + offset
     }
 }

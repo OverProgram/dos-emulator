@@ -1,4 +1,23 @@
+use std::fs::File;
+use std::fs;
+use std::io::Read;
+
 pub mod cpu;
+
+fn new_cpu_from_file(filename: &str) -> cpu::CPU {
+    let mut computer = cpu::CPU::new(0x7FFFFF);
+    computer.set_reg(cpu::Regs::SS, 0x3FD);
+    computer.set_reg(cpu::Regs::CS, 0x103FC);
+    computer.set_reg(cpu::Regs::DS, 0x203FB);
+
+    let mut f = File::open(&filename).expect("No file found!");
+    let metadata = fs::metadata(&filename).expect("No file found!");
+    let mut buffer = vec![0; metadata.len() as usize];
+    f.read(&mut buffer).expect("Couldn't read file!");
+    computer.load(buffer, 0x103FC);
+
+    computer
+}
 
 #[cfg(test)]
 mod tests {
