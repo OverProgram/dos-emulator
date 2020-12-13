@@ -2,6 +2,7 @@ mod reg;
 mod mem;
 mod alu;
 mod stack;
+mod jmp;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -183,6 +184,18 @@ impl CPU {
             opcodes.insert(0x58 + x, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
         }
         opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
+        //Jump opcodes
+        opcodes.insert(0xE9, Opcode::new(Rc::new(Self::jmp), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::IMMEDIATE));
+        let flag_condition: Vec<Box<dyn Fn(&Self) -> bool>> = vec![Box::new(|this: &Self| this.check_flag(CPUFlags::OVERFLOW)), Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY)}),
+                                Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}),
+                                Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY) || this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY) && !this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN)}),
+                                Box::new(|this: &Self| {!this.check_flag(CPUFlags::SIGN)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::PARITY)}), Box::new(|this: &Self| {this.check_flag(!CPUFlags::PARITY)}),
+                                Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {!this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW) || this.check_flag(CPUFlags::ZERO)}),
+                                Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN) && !this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)})];
+        let i = 0;
+        for condition in flag_condition {
+            opcodes.insert(0x70 + i, Opcode::new(Self::cond_jmp(condition), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::IMMEDIATE));
+        }
 
         Self {
             ram,
@@ -214,7 +227,10 @@ impl CPU {
                 Some(opcode) => opcode,
                 None => match self.opcodes.get(&(code & 0xFE)) {
                     Some(opcode) => opcode,
-                    None => self.opcodes.get(&(code & 0xFC)).unwrap()
+                    None => match self.opcodes.get(&(code & 0xFC)) {
+                        Some(val) => val,
+                        None => self.opcodes.get(&(code & 0xFD)).unwrap()
+                    }
                 }
             };
             self.instruction = Some(opcode.clone());
@@ -302,17 +318,33 @@ impl CPU {
                 },
                 NumArgs::One => {
                     if let None = self.dst {
-                        let mod_reg_rm = self.read_ip();
-                        let rm = (mod_reg_rm & 0x07) >> 0;
-                        let mod_bits = (mod_reg_rm & 0xC0) >> 6;
-                        let arg = self.translate_mod_rm(mod_bits, rm, s);
-                        self.dst = arg;
-                        self.reg_bits = (mod_reg_rm & 0x38) >> 3;
+                        if immediate {
+                            self.dst = Some(if d == 0 && !size_mismatch {
+                                DstArg::Imm16(self.read_ip_word())
+                            } else {
+                                DstArg::Imm8(self.read_ip())
+                            })
+                        } else {
+                            let mod_reg_rm = self.read_ip();
+                            let rm = (mod_reg_rm & 0x07) >> 0;
+                            let mod_bits = (mod_reg_rm & 0xC0) >> 6;
+                            let arg = self.translate_mod_rm(mod_bits, rm, s);
+                            self.dst = arg;
+                            self.reg_bits = (mod_reg_rm & 0x38) >> 3;
+                        }
                     }
                 },
                 NumArgs::Zero => ()
             }
         }
+    }
+
+    fn check_flag(&self, flag: u16) -> bool {
+        self.regs[&Regs::FLAGS].value & flag != 0
+    }
+
+    fn check_flags_not_equal(&self, flag1: u16, flag2: u16) -> bool {
+        self.regs[&Regs::FLAGS].value & flag1 != self.regs[&Regs::FLAGS].value & flag2
     }
 
     fn read_ip(&mut self) -> u8 {

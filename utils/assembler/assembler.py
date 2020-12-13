@@ -35,6 +35,8 @@ def compile_code(code):
         return
     call_cmd("objcopy -O binary {} {}".format(obj_file.name, bin_file.name))
     hexdump = bin_file.read()
+    # while hexdump[0] == 0:
+    #     hexdump = hexdump[1:]
     asm_file.close()
     obj_file.close()
     bin_file.close()

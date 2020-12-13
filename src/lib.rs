@@ -175,3 +175,22 @@ mod stack_test {
         assert_eq!(computer.read_reg(Regs::BX).unwrap(), 0x05);
     }
 }
+
+#[cfg(test)]
+mod jmp_test {
+    use crate::cpu::Regs;
+    use crate::{new_cpu_from_file};
+
+    #[test]
+    fn test_jmp() {
+        let mut computer = new_cpu_from_file("tests/objects/jmp.out");
+        computer.execute_next();
+        computer.execute_next();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x06);
+    }
+
+    #[test]
+    fn test_cond_jmp() {
+
+    }
+}
