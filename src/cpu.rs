@@ -13,6 +13,8 @@ impl OpcodeFlags {
     const NONE: u32 = 0;
     const IMMEDIATE: u32 = 0x01;
     const SIZE_MISMATCH: u32 = 0x02;
+    const NOP: u32 = 0x04;
+    const FORCE_WORD: u32 = 0x08;
 }
 
 pub struct CPUFlags ;
@@ -43,7 +45,8 @@ enum DstArg {
     Imm8(u8),
     Imm16(u16),
     Ptr16(u16),
-    Ptr8(u16)
+    Ptr8(u16),
+    Reg(Regs)
 }
 
 #[derive(Clone, Debug)]
@@ -61,7 +64,7 @@ enum Placeholder {
     Ptr
 }
 
-#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
 pub enum Regs {
     AX,
     BX,
@@ -109,7 +112,7 @@ impl Opcode {
 
     fn has_flag(&self, flag: u32) -> Result<bool, &str> {
         match flag {
-            OpcodeFlags::SIZE_MISMATCH | OpcodeFlags::IMMEDIATE => Ok(if (self.flags & flag) > 0 { true } else { false }),
+            OpcodeFlags::SIZE_MISMATCH | OpcodeFlags::IMMEDIATE | OpcodeFlags::NOP | OpcodeFlags::FORCE_WORD => Ok(if (self.flags & flag) > 0 { true } else { false }),
             _ => Err("invalid flags!")
         }
     }
@@ -151,6 +154,8 @@ impl CPU {
 
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
+        //NOP
+        opcodes.insert(0x90, Opcode::new(Rc::new(Self::nop), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::NOP));
         // Move opcodes
         opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::NONE));
         opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), Regs::DS, OpcodeFlags::NONE));
@@ -184,6 +189,8 @@ impl CPU {
             opcodes.insert(0x58 + x, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
         }
         opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
+        opcodes.insert(0xE8, Opcode::new(Rc::new(Self::call), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::FORCE_WORD));
+        opcodes.insert(0xC3, Opcode::new(Rc::new(Self::ret), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::FORCE_WORD));
         //Jump opcodes
         opcodes.insert(0xE9, Opcode::new(Rc::new(Self::jmp), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::IMMEDIATE));
         let flag_condition: Vec<Box<dyn Fn(&Self) -> bool>> = vec![Box::new(|this: &Self| this.check_flag(CPUFlags::OVERFLOW)), Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY)}),
@@ -192,9 +199,10 @@ impl CPU {
                                 Box::new(|this: &Self| {!this.check_flag(CPUFlags::SIGN)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::PARITY)}), Box::new(|this: &Self| {this.check_flag(!CPUFlags::PARITY)}),
                                 Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {!this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW) || this.check_flag(CPUFlags::ZERO)}),
                                 Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN) && !this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)})];
-        let i = 0;
+        let mut i = 0;
         for condition in flag_condition {
-            opcodes.insert(0x70 + i, Opcode::new(Self::cond_jmp(condition), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::IMMEDIATE));
+            opcodes.insert(0x70 + i, Opcode::new(Self::cond_jmp(condition), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
+            i += 1;
         }
 
         Self {
@@ -223,16 +231,7 @@ impl CPU {
             let code = self.read_ip();
             let d = (code & 0x02) >> 1;
             let mut s = (code & 0x01) >> 0;
-            let opcode = match self.opcodes.get(&code) {
-                Some(opcode) => opcode,
-                None => match self.opcodes.get(&(code & 0xFE)) {
-                    Some(opcode) => opcode,
-                    None => match self.opcodes.get(&(code & 0xFC)) {
-                        Some(val) => val,
-                        None => self.opcodes.get(&(code & 0xFD)).unwrap()
-                    }
-                }
-            };
+            let opcode = self.get_opcode(&code).clone();
             self.instruction = Some(opcode.clone());
             self.next_cycles += opcode.cycles;
             self.seg = if let None = seg {
@@ -242,6 +241,7 @@ impl CPU {
             };
             let immediate = opcode.has_flag(OpcodeFlags::IMMEDIATE).unwrap();
             let size_mismatch = opcode.has_flag(OpcodeFlags::SIZE_MISMATCH).unwrap();
+            let force_word = opcode.has_flag(OpcodeFlags::FORCE_WORD).unwrap();
             let num_args = opcode.num_args;
             let shorthand = opcode.shorthand.clone();
 
@@ -287,7 +287,7 @@ impl CPU {
                         };
                         let arg1 = if immediate {
                             Some(
-                                if s == 1 && !size_mismatch {
+                                if (s == 1 && !size_mismatch) || force_word {
                                     DstArg::Imm16(self.read_ip_word())
                                 } else {
                                     DstArg::Imm8(self.read_ip())
@@ -319,7 +319,7 @@ impl CPU {
                 NumArgs::One => {
                     if let None = self.dst {
                         if immediate {
-                            self.dst = Some(if d == 0 && !size_mismatch {
+                            self.dst = Some(if (d == 0 && !size_mismatch) || force_word {
                                 DstArg::Imm16(self.read_ip_word())
                             } else {
                                 DstArg::Imm8(self.read_ip())
@@ -335,6 +335,19 @@ impl CPU {
                     }
                 },
                 NumArgs::Zero => ()
+            }
+        }
+    }
+
+    fn get_opcode(&mut self, code: &u8) -> &Opcode {
+        match self.opcodes.get(&code) {
+            Some(opcode) => opcode,
+            None => match self.opcodes.get(&(code & 0xFE)) {
+                Some(opcode) => opcode,
+                None => match self.opcodes.get(&(code & 0xFC)) {
+                    Some(val) => val,
+                    None => self.opcodes.get(&(code & 0xFD)).unwrap()
+                }
             }
         }
     }
@@ -374,7 +387,8 @@ impl CPU {
             DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
             DstArg::Imm16(val) => Some(SrcArg::Word(val)),
             DstArg::Ptr16(ptr) => Some(SrcArg::Word(self.read_mem_word(ptr)?)),
-            DstArg::Ptr8(ptr) => Some(SrcArg::Byte(self.read_mem_byte(ptr)?))
+            DstArg::Ptr8(ptr) => Some(SrcArg::Byte(self.read_mem_byte(ptr)?)),
+            DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
         }
     }
 
@@ -462,6 +476,13 @@ impl CPU {
                     WordPart::Low => { reg.set_low(value) },
                     WordPart::High => { reg.set_high(value) }
                 }
+                Ok(())
+            },
+            DstArg::Reg(reg) => {
+                self.regs.get_mut(&reg).unwrap().value = match val_arg {
+                    SrcArg::Word(val) => val,
+                    SrcArg::Byte(_) => return Err("Mismatch operand sizes")
+                };
                 Ok(())
             },
             DstArg::Ptr16(ptr) => {
@@ -578,6 +599,20 @@ impl CPU {
                 }
             }
         }.unwrap()
+    }
+
+    fn sub_command(&mut self, opcode: u8, src: Option<SrcArg>, dst: Option<DstArg>, reg_bits: u8) {
+        let tmp_src = self.src.clone();
+        let tmp_dst = self.dst.clone();
+        let tmp_reg_bits = self.reg_bits;
+        self.src = src;
+        self.dst = dst;
+        self.reg_bits = reg_bits;
+        let opcode = self.get_opcode(&opcode).clone();
+        self.next_cycles += (opcode.instruction)(self);
+        self.src = tmp_src;
+        self.dst = tmp_dst;
+        self.reg_bits = tmp_reg_bits;
     }
 
     fn check_carry_add(&mut self, arg: SrcArg) {
@@ -714,6 +749,14 @@ impl CPU {
     pub fn execute_next_from(&mut self, loc: u16) {
         self.regs.get_mut(&Regs::IP).unwrap().value = loc;
         self.execute_next();
+    }
+
+    pub fn run_to_nop(&mut self, loc: u16) {
+        self.regs.get_mut(&Regs::IP).unwrap().value = loc;
+        self.step();
+        while match self.instruction.clone() { Some(instruction) => instruction.flags & OpcodeFlags::NOP == 0, None => true } {
+            self.step();
+        }
     }
 
     pub fn set_reg(&mut self, reg: Regs, val: u16) {

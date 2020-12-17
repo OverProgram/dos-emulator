@@ -16,4 +16,15 @@ impl CPU {
         self.regs.get_mut(&Regs::SP).unwrap().value += 2;
         1
     }
+
+    pub fn call(&mut self) -> usize {
+        self.sub_command(0xFF, None, Some(DstArg::Reg(Regs::IP)), 0b110);
+        self.jmp()
+    }
+
+    pub fn ret(&mut self) -> usize {
+        self.sub_command(0x8F, None, Some(DstArg::Reg(Regs::IP)), 0b000);
+        self.sub_command(0xE9, None, Some(DstArg::Reg(Regs::IP)), 0b000);
+        0
+    }
 }

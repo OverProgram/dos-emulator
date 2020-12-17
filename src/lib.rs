@@ -174,6 +174,13 @@ mod stack_test {
         computer.execute_next();
         assert_eq!(computer.read_reg(Regs::BX).unwrap(), 0x05);
     }
+
+    #[test]
+    fn test_proc() {
+        let mut computer = new_cpu_from_file("tests/objects/proc.out");
+        computer.run_to_nop(0);
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x16);
+    }
 }
 
 #[cfg(test)]
@@ -191,6 +198,8 @@ mod jmp_test {
 
     #[test]
     fn test_cond_jmp() {
-
+        let mut computer = new_cpu_from_file("tests/objects/jmp_cond.out");
+        computer.run_to_nop(0);
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x16);
     }
 }
