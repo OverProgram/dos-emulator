@@ -342,11 +342,11 @@ impl CPU {
     fn get_opcode(&mut self, code: &u8) -> &Opcode {
         match self.opcodes.get(&code) {
             Some(opcode) => opcode,
-            None => match self.opcodes.get(&(code & 0xFE)) {
+            None => match self.opcodes.get(&(code & 0xFD)) {
                 Some(opcode) => opcode,
                 None => match self.opcodes.get(&(code & 0xFC)) {
                     Some(val) => val,
-                    None => self.opcodes.get(&(code & 0xFD)).unwrap()
+                    None => self.opcodes.get(&(code & 0xFE)).unwrap()
                 }
             }
         }
