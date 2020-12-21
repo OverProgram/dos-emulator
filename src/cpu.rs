@@ -3,6 +3,7 @@ mod mem;
 mod alu;
 mod stack;
 mod jmp;
+mod int;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -60,6 +61,8 @@ enum Placeholder {
     Reg8(u8),
     Reg16(u8),
     Reg(u8),
+    Byte(u8),
+    Word(u16),
     Imm,
     Ptr
 }
@@ -127,7 +130,8 @@ pub struct CPU {
     dst: Option<DstArg>,
     seg: Regs,
     next_cycles: usize,
-    reg_bits: u8
+    reg_bits: u8,
+    irq: Option<u8>
 }
 
 impl CPU {
@@ -191,7 +195,7 @@ impl CPU {
         opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
         opcodes.insert(0xE8, Opcode::new(Rc::new(Self::call), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::FORCE_WORD));
         opcodes.insert(0xC3, Opcode::new(Rc::new(Self::ret), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::FORCE_WORD));
-        //Jump opcodes
+        // Jump opcodes
         opcodes.insert(0xE9, Opcode::new(Rc::new(Self::jmp), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::IMMEDIATE));
         let flag_condition: Vec<Box<dyn Fn(&Self) -> bool>> = vec![Box::new(|this: &Self| this.check_flag(CPUFlags::OVERFLOW)), Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY)}),
                                 Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}),
@@ -204,6 +208,10 @@ impl CPU {
             opcodes.insert(0x70 + i, Opcode::new(Self::cond_jmp(condition), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
             i += 1;
         }
+        // Interrupt opcodes
+        opcodes.insert(0xCD, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0xCC, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0xCF, Opcode::new(Rc::new(Self::iret), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::NONE));
 
         Self {
             ram,
@@ -214,7 +222,8 @@ impl CPU {
             dst: None,
             seg: Regs::DS,
             next_cycles: 0,
-            reg_bits: 0
+            reg_bits: 0,
+            irq: None,
         }
     }
 
@@ -226,6 +235,8 @@ impl CPU {
             self.instruction = None;
             self.src = None;
             self.dst = None;
+        } else if let Some(_) = self.irq {
+            self.next_cycles += self.int();
         } else {
             let seg: Option<Regs> = None;
             let code = self.read_ip();
@@ -559,6 +570,8 @@ impl CPU {
             }
             Placeholder::Reg8(reg) => DstArg::Reg8(reg),
             Placeholder::Reg16(reg) => DstArg::Reg16(reg),
+            Placeholder::Word(val) => DstArg::Imm16(val),
+            Placeholder::Byte(val) => DstArg::Imm8(val),
             Placeholder::Ptr => DstArg::Ptr16((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
         }
     }
