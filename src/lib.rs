@@ -158,7 +158,7 @@ mod stack_test {
 
     #[test]
     fn test_push() {
-        let mut computer = new_cpu_from_file("tests/objects/push.out");
+        let mut computer = new_cpu_from_file("tests/obj/push.out");
         computer.execute_next();
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x05);
         computer.execute_next();
@@ -168,7 +168,7 @@ mod stack_test {
 
     #[test]
     fn test_pop() {
-        let mut computer = new_cpu_from_file("tests/objects/pop.out");
+        let mut computer = new_cpu_from_file("tests/obj/pop.out");
         computer.execute_next();
         computer.execute_next();
         computer.execute_next();
@@ -177,7 +177,7 @@ mod stack_test {
 
     #[test]
     fn test_proc() {
-        let mut computer = new_cpu_from_file("tests/objects/proc.out");
+        let mut computer = new_cpu_from_file("tests/obj/proc.out");
         computer.run_to_nop(0);
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x16);
     }
@@ -190,7 +190,7 @@ mod jmp_test {
 
     #[test]
     fn test_jmp() {
-        let mut computer = new_cpu_from_file("tests/objects/jmp.out");
+        let mut computer = new_cpu_from_file("tests/obj/jmp.out");
         computer.execute_next();
         computer.execute_next();
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x06);
@@ -198,7 +198,7 @@ mod jmp_test {
 
     #[test]
     fn test_cond_jmp() {
-        let mut computer = new_cpu_from_file("tests/objects/jmp_cond.out");
+        let mut computer = new_cpu_from_file("tests/obj/jmp_cond.out");
         computer.run_to_nop(0);
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x16);
     }
