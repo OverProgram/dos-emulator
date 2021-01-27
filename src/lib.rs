@@ -180,6 +180,7 @@ mod stack_test {
         let mut computer = new_cpu_from_file("tests/obj/proc.out");
         computer.run_to_nop(0);
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x16);
+        assert_eq!(computer.read_reg(Regs::SP).unwrap(), 0xFFFF);
     }
 }
 
@@ -201,5 +202,20 @@ mod jmp_test {
         let mut computer = new_cpu_from_file("tests/obj/jmp_cond.out");
         computer.run_to_nop(0);
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x16);
+    }
+}
+
+#[cfg(test)]
+mod int_test {
+    use crate::new_cpu_from_file;
+    use crate::cpu::Regs;
+
+    #[test]
+    fn test_soft_int() {
+        let mut computer = new_cpu_from_file("tests/obj/int.out");
+        computer.load(vec![0x06, 0x00, 0x3F, 0x10], 0);
+        computer.run_to_nop(0);
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 5);
+        assert_eq!(computer.read_reg(Regs::SP).unwrap(), 0xFFFF);
     }
 }

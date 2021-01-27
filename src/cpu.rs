@@ -11,11 +11,12 @@ use std::rc::Rc;
 struct OpcodeFlags;
 
 impl OpcodeFlags {
-    const NONE: u32 = 0;
+    const NONE: u32 = 0x00;
     const IMMEDIATE: u32 = 0x01;
     const SIZE_MISMATCH: u32 = 0x02;
     const NOP: u32 = 0x04;
     const FORCE_WORD: u32 = 0x08;
+    const FORCE_BYTE: u32 = 0x10;
 }
 
 pub struct CPUFlags ;
@@ -115,7 +116,7 @@ impl Opcode {
 
     fn has_flag(&self, flag: u32) -> Result<bool, &str> {
         match flag {
-            OpcodeFlags::SIZE_MISMATCH | OpcodeFlags::IMMEDIATE | OpcodeFlags::NOP | OpcodeFlags::FORCE_WORD => Ok(if (self.flags & flag) > 0 { true } else { false }),
+            OpcodeFlags::SIZE_MISMATCH | OpcodeFlags::IMMEDIATE | OpcodeFlags::NOP | OpcodeFlags::FORCE_WORD | OpcodeFlags::FORCE_BYTE => Ok(if (self.flags & flag) > 0 { true } else { false }),
             _ => Err("invalid flags!")
         }
     }
@@ -209,7 +210,7 @@ impl CPU {
             i += 1;
         }
         // Interrupt opcodes
-        opcodes.insert(0xCD, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0xCD, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::FORCE_BYTE));
         opcodes.insert(0xCC, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::IMMEDIATE));
         opcodes.insert(0xCF, Opcode::new(Rc::new(Self::iret), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::NONE));
 
@@ -253,6 +254,7 @@ impl CPU {
             let immediate = opcode.has_flag(OpcodeFlags::IMMEDIATE).unwrap();
             let size_mismatch = opcode.has_flag(OpcodeFlags::SIZE_MISMATCH).unwrap();
             let force_word = opcode.has_flag(OpcodeFlags::FORCE_WORD).unwrap();
+            let force_byte = opcode.has_flag(OpcodeFlags::FORCE_BYTE).unwrap();
             let num_args = opcode.num_args;
             let shorthand = opcode.shorthand.clone();
 
@@ -298,7 +300,7 @@ impl CPU {
                         };
                         let arg1 = if immediate {
                             Some(
-                                if (s == 1 && !size_mismatch) || force_word {
+                                if ((s == 1 && !size_mismatch) || force_word) && !force_byte {
                                     DstArg::Imm16(self.read_ip_word())
                                 } else {
                                     DstArg::Imm8(self.read_ip())
@@ -330,7 +332,7 @@ impl CPU {
                 NumArgs::One => {
                     if let None = self.dst {
                         if immediate {
-                            self.dst = Some(if (d == 0 && !size_mismatch) || force_word {
+                            self.dst = Some(if ((d == 0 && !size_mismatch) || force_word) && !force_byte {
                                 DstArg::Imm16(self.read_ip_word())
                             } else {
                                 DstArg::Imm8(self.read_ip())
