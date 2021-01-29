@@ -37,7 +37,7 @@ impl CPU {
     pub fn add(&mut self) -> usize {
         self.check_carry_add(self.src.clone().unwrap());
         let sum = self.operation_2_args(|src, dst| Self::add_with_carry_8_bit(dst, src), |src, dst| Self::add_with_carry_16_bit(dst, src));
-        self.check_zero(&sum);
+        self.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
         self.write_to_arg(self.dst.clone().unwrap(), sum).unwrap();
         0
     }
@@ -45,58 +45,65 @@ impl CPU {
     pub fn sub(&mut self) -> usize {
         self.check_carry_sub(self.src.clone().unwrap());
         let dif = self.operation_2_args(|src, dst| Self::sub_with_carry_8_bit(dst, src), |src, dst| Self::sub_with_carry_16_bit(dst, src));
-        self.check_zero(&dif);
+        self.check_flags_in_result(&dif, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
         self.write_to_arg(self.dst.clone().unwrap(), dif).unwrap();
         0
     }
 
     pub fn and(&mut self) -> usize {
         let result = self.operation_2_args(|src, dst| dst & src, |src, dst| dst & src);
-        self.check_zero(&result);
+        self.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
         self.write_to_arg(self.dst.clone().unwrap(), result).unwrap();
         0
     }
 
     pub fn or(&mut self) -> usize {
         let result = self.operation_2_args(|src, dst| dst | src, |src, dst| dst | src);
-        self.check_zero(&result);
+        self.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
         self.write_to_arg(self.dst.clone().unwrap(), result).unwrap();
         0
     }
 
     pub fn xor(&mut self) -> usize {
         let result = self.operation_2_args(|src, dst| dst ^ src, |src, dst| dst ^ src);
-        self.check_zero(&result);
+        self.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
         self.write_to_arg(self.dst.clone().unwrap(), result).unwrap();
         0
     }
 
     pub fn not(&mut self) -> usize {
         let result = self.operation_1_arg(|dst| !dst, |dst| !dst);
-        self.check_zero(&result);
         self.write_to_arg(self.dst.clone().unwrap(), result).unwrap();
         0
     }
 
     pub fn neg(&mut self) -> usize {
         let result = self.operation_1_arg(|dst| Self::twos_compliment_byte(dst), |dst| Self::twos_compliment_word(dst));
-        self.check_zero(&result);
+        self.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
         self.write_to_arg(self.dst.clone().unwrap(), result).unwrap();
         0
     }
 
     pub fn inc(&mut self) -> usize {
-        self.check_carry_add(SrcArg::Byte(1));
-        let sum = self.operation_1_arg(|dst| Self::add_with_carry_8_bit(dst, 1), |dst| Self::add_with_carry_16_bit(dst, 1));
-        self.check_zero(&sum);
+        // self.check_carry_add(SrcArg::Byte(1));
+        match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+            SrcArg::Byte(dst) => self.set_flag_if(CPUFlags::OVERFLOW, dst as u16 + 1 > 255),
+            SrcArg::Word(dst) => self.set_flag_if(CPUFlags::OVERFLOW, dst as u32 + 1 > 65535)
+
+        }
+        let sum = self.operation_1_arg(|dst| {
+            Self::add_with_carry_8_bit(dst, 1)
+        }, |dst| {
+            Self::add_with_carry_16_bit(dst, 1)
+        });
+        self.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
         self.write_to_arg(self.dst.clone().unwrap(), sum).unwrap();
         0
     }
 
     pub fn dec(&mut self) -> usize {
-        self.check_carry_sub(SrcArg::Byte(1));
         let sum = self.operation_1_arg(|dst| Self::sub_with_carry_8_bit(dst, 1), |dst| Self::sub_with_carry_16_bit(dst, 1));
-        self.check_zero(&sum);
+        self.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
         self.write_to_arg(self.dst.clone().unwrap(), sum).unwrap();
         0
     }

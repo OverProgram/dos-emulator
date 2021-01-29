@@ -123,10 +123,10 @@ mod test_alu {
     }
 
     #[test]
-    fn test_carry() {
+    fn test_flags() {
         let mut computer = new_cpu_vec(vec![0xff, 0xfe, 0x6, 0x0, 0x0]);
         computer.execute_next_from(1);
-        assert_eq!(computer.read_reg(Regs::FLAGS).unwrap() & (cpu::CPUFlags::CARRY | cpu::CPUFlags::ZERO), (cpu::CPUFlags::CARRY | cpu::CPUFlags::ZERO));
+        assert_eq!(computer.read_reg(Regs::FLAGS).unwrap() & (cpu::CPUFlags::OVERFLOW | cpu::CPUFlags::ZERO), (cpu::CPUFlags::OVERFLOW | cpu::CPUFlags::ZERO));
     }
 
     #[test]

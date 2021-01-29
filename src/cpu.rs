@@ -647,18 +647,52 @@ impl CPU {
         };
     }
 
-    fn check_zero(&mut self, result: &SrcArg) {
-        if Self::check_src_arg(result, 0) {
-            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::ZERO;
-        } else {
-            self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !CPUFlags::ZERO;
+    fn check_flags_in_result(&mut self, result: &SrcArg, flags: u16) {
+        if Self::check_flag_in_reg(flags, CPUFlags::AUX_CARRY) {
+            self.check_aux_carry(result);
+        }
+        if Self::check_flag_in_reg(flags, CPUFlags::ZERO) {
+            self.check_zero(result);
+        }
+        if Self::check_flag_in_reg(flags, CPUFlags::SIGN) {
+            self.check_sign(result);
         }
     }
 
-    fn check_src_arg(arg: &SrcArg, eq: u16) -> bool {
+    fn check_flag_in_reg(flags: u16, flag: u16) -> bool {
+        (flags & flag) > 0
+    }
+
+    fn check_zero(&mut self, result: &SrcArg) {
+        self.set_flag_if(CPUFlags::ZERO, Self::check_src_arg(result, |val| val == 0, |val| val == 0));
+    }
+
+    fn check_aux_carry(&mut self, result: &SrcArg) {
+        self.set_flag_if(CPUFlags::AUX_CARRY, Self::check_src_arg(result, |val| (val & 0xF0) != 0, |val| (val & 0xF0) != 0));
+    }
+
+    fn check_sign(&mut self, result: &SrcArg) {
+        self.set_flag_if(CPUFlags::SIGN, Self::check_src_arg(result, |val| (val & 0x80) != 0, |val| (val & 0x80) != 0));
+    }
+
+    fn check_parity(&mut self, result: &SrcArg) {
+        self.set_flag_if(CPUFlags::PARITY, Self::check_src_arg(result, |val| (val & 0x01) != 0, |val| (val & 0x01) != 0));
+    }
+
+    fn set_flag_if(&mut self, flag: u16, cond: bool) {
+        if cond {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= flag;
+        } else {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !flag;
+        }
+    }
+
+    fn check_src_arg<T, U>(arg: &SrcArg, byte: T, word: U) -> bool where
+        T: Fn(u8)-> bool,
+        U: Fn(u16) -> bool {
         match arg {
-            SrcArg::Byte(val) => *val == eq as u8,
-            SrcArg::Word(val) => *val == eq
+            SrcArg::Byte(val) => byte(*val),
+            SrcArg::Word(val) => word(*val)
         }
     }
 
@@ -689,9 +723,9 @@ impl CPU {
 
     fn check_carry_16_bit(&mut self, arg1: u16, arg2: u16) {
         if (arg1 as u32) + (arg2 as u32) > 65535 {
-            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::CARRY;
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= (CPUFlags::CARRY | CPUFlags::OVERFLOW);
         } else {
-            self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !CPUFlags::CARRY;
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !(CPUFlags::CARRY | CPUFlags::OVERFLOW);
         }
     }
 
