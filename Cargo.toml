@@ -3,5 +3,6 @@
 members = [
 	"xtreme86",
 	"enumflags",
-	"enumflags-derive"
+	"enumflags-derive",
+	"enumflags-example"
 ]

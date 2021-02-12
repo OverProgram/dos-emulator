@@ -3,9 +3,6 @@
 [[package]]
 name = "enumflags"
 version = "0.1.0"
-dependencies = [
- "enumflags-derive 0.1.0",
-]
 
 [[package]]
 name = "enumflags-derive"
@@ -13,6 +10,14 @@ version = "0.1.0"
 dependencies = [
  "quote 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.60 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "enumflags-example"
+version = "0.1.0"
+dependencies = [
+ "enumflags 0.1.0",
+ "enumflags-derive 0.1.0",
 ]
 
 [[package]]

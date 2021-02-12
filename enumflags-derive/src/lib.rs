@@ -16,7 +16,7 @@ pub fn enum_flags_derive(input: TokenStream) -> TokenStream {
 
     match input.clone().data {
         Data::Enum(enum_token) => {
-            let mut count = 0;
+            let mut count: usize = 0;
             for variant in enum_token.variants {
                 let loc = match variant.discriminant {
                     Some((_, expr)) => expr.into_token_stream(),
