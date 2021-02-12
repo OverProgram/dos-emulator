@@ -1,10 +1,7 @@
 pub mod container;
 
-extern crate num_traits;
-
 use std::ops;
 use crate::container::FlagContainer;
-use std::ops::Not;
 
 pub trait FlagBits {
     type Container: container::FlagContainer + std::ops::BitOr<Output = Self::Container> +
