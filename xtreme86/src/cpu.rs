@@ -33,6 +33,18 @@ impl CPUFlags {
     pub const OVERFLOW: u16 = 0x0800;
 }
 
+mod exceptions {
+    pub const DIVIDE_BY_ZERO: u8 = 0x00;
+    pub const SINGLE_STEP_INSTRUCTION: u8 = 0x01;
+    pub const NMI: u8 = 0x02;
+    pub const BREAKPOINT: u8 = 0x03;
+    pub const INTO: u8 = 0x04;
+    pub const BOUND: u8 = 0x05;
+    pub const INVALID_OPCODE: u8 = 0x06;
+    pub const NO_EXTENSION: u8 = 0x07;
+    pub const IVT_TOO_SMALL: u8 = 0x08;
+}
+
 #[derive(Clone, Copy, Debug)]
 enum NumArgs {
     Zero,
@@ -132,7 +144,8 @@ pub struct CPU {
     seg: Regs,
     next_cycles: usize,
     reg_bits: u8,
-    irq: Option<u8>
+    irq: Option<u8>,
+    opcode_address: (u16, u16),
 }
 
 impl CPU {
@@ -225,6 +238,7 @@ impl CPU {
             next_cycles: 0,
             reg_bits: 0,
             irq: None,
+            opcode_address: (0, 0),
         }
     }
 
@@ -239,6 +253,8 @@ impl CPU {
         } else if let Some(_) = self.irq {
             self.next_cycles += self.int();
         } else {
+            let opcode_address =  (self.regs[Regs::CS], self.regs[Regs::IP]);
+            self.opcode_address = opcode_address;
             let seg: Option<Regs> = None;
             let code = self.read_ip();
             let d = (code & 0x02) >> 1;
@@ -363,6 +379,22 @@ impl CPU {
                 }
             }
         }
+    }
+
+    fn except(&mut self, code: u8) -> Result<(), String> {
+        match code {
+            exceptions::DIVIDE_BY_ZERO | exceptions::BOUND | exceptions::INVALID_OPCODE | exceptions::NO_EXTENSION => {
+                let opcode_start = self.opcode_address;
+                self.regs.get_mut(&Regs::CS).unwrap().value = opcode_start.0;
+                self.regs.get_mut(&Regs::IP).unwrap().value = opcode_start.1;
+            }
+            exceptions::INTO => {
+            }
+            _ => return Err(String::from("Invalid exception code!"))
+        }
+
+        self.irq = Some(code);
+        Ok(())
     }
 
     fn check_flag(&self, flag: u16) -> bool {
