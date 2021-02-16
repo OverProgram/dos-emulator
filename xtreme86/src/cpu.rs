@@ -7,16 +7,29 @@ mod int;
 
 use std::collections::HashMap;
 use std::rc::Rc;
+use enumflags2::BitFlags;
+use std::fmt::{Debug, Formatter};
+use std::fmt;
 
-struct OpcodeFlags;
+// struct OpcodeFlags;
+//
+// impl OpcodeFlags {
+//     const NONE: u32 = 0x00;
+//     const IMMEDIATE: u32 = 0x01;
+//     const SIZE_MISMATCH: u32 = 0x02;
+//     const NOP: u32 = 0x04;
+//     const FORCE_WORD: u32 = 0x08;
+//     const FORCE_BYTE: u32 = 0x10;
+// }
 
-impl OpcodeFlags {
-    const NONE: u32 = 0x00;
-    const IMMEDIATE: u32 = 0x01;
-    const SIZE_MISMATCH: u32 = 0x02;
-    const NOP: u32 = 0x04;
-    const FORCE_WORD: u32 = 0x08;
-    const FORCE_BYTE: u32 = 0x10;
+#[derive(BitFlags, Copy, Clone, Debug, PartialEq)]
+#[repr(u32)]
+enum OpcodeFlags {
+    Immediate = 0x01,
+    SizeMismatch = 0x02,
+    Nop = 0x04,
+    ForceWord = 0x08,
+    ForceByte = 0x10
 }
 
 pub struct CPUFlags ;
@@ -110,12 +123,12 @@ struct Opcode {
     num_args: NumArgs,
     cycles: usize,
     shorthand: Option<(Placeholder, Option<Placeholder>)>,
-    flags: u32,
+    flags: BitFlags<OpcodeFlags>,
     segment: Regs
 }
 
 impl Opcode {
-    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, segment: Regs, flags: u32) -> Self {
+    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, segment: Regs, flags: BitFlags<OpcodeFlags>) -> Self {
         Self {
             instruction,
             num_args,
@@ -126,14 +139,24 @@ impl Opcode {
         }
     }
 
-    fn has_flag(&self, flag: u32) -> Result<bool, &str> {
-        match flag {
-            OpcodeFlags::SIZE_MISMATCH | OpcodeFlags::IMMEDIATE | OpcodeFlags::NOP | OpcodeFlags::FORCE_WORD | OpcodeFlags::FORCE_BYTE => Ok(if (self.flags & flag) > 0 { true } else { false }),
-            _ => Err("invalid flags!")
-        }
+    fn has_flag(&self, flag: BitFlags<OpcodeFlags>) -> bool {
+        self.flags.contains(flag)
     }
 }
 
+impl fmt::Debug for Opcode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Opcode")
+            .field("num_args", &self.num_args)
+            .field("cycles", &self.cycles)
+            .field("shorthand", &self.shorthand)
+            .field("flags", &self.flags)
+            .field("segment", &self.segment)
+            .finish()
+    }
+}
+
+#[derive(Debug)]
 pub struct CPU {
     ram: Vec<u8>,
     regs: HashMap<Regs, reg::Reg>,
@@ -173,15 +196,15 @@ impl CPU {
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
         //NOP
-        opcodes.insert(0x90, Opcode::new(Rc::new(Self::nop), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::NOP));
+        opcodes.insert(0x90, Opcode::new(Rc::new(Self::nop), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::Nop.into()));
         // Move opcodes
-        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::NONE));
-        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), Regs::DS, OpcodeFlags::NONE));
+        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), Regs::DS, BitFlags::empty()));
         for x in 0..7 {
-            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))),Regs::DS, OpcodeFlags::IMMEDIATE));
-            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::IMMEDIATE));
+            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))),Regs::DS, OpcodeFlags::Immediate.into()));
+            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
         }
-        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
         // ALU opcodes
         let mut alu_opcodes: Vec<(Rc<dyn Fn(&mut CPU) -> usize>, u8)> = Vec::new();
         alu_opcodes.push((Rc::new(Self::add), 0x00));
@@ -190,27 +213,27 @@ impl CPU {
         alu_opcodes.push((Rc::new(Self::and), 0x20));
         alu_opcodes.push((Rc::new(Self::or), 0x08));
         for (instruction, offset) in alu_opcodes.into_iter() {
-            opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::NONE));
-            opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::IMMEDIATE));
+            opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
+            opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
         }
-        opcodes.insert(0x80, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0x80, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
         for x in 0..7 {
-            opcodes.insert(0x40 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
-            opcodes.insert(0x48 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
+            opcodes.insert(0x40 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+            opcodes.insert(0x48 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
         }
-        opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
-        opcodes.insert(0xFE, Opcode::new(Rc::new(Self::alu_dispatch_one_arg), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
-        opcodes.insert(0xF6, Opcode::new(Rc::new(Self::mul_dispatch), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
+        opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
+        opcodes.insert(0xFE, Opcode::new(Rc::new(Self::alu_dispatch_one_arg), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xF6, Opcode::new(Rc::new(Self::mul_dispatch), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
         // Stack opcodes
         for x in 0..7 {
-            opcodes.insert(0x50 + x, Opcode::new(Rc::new(Self::push), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
-            opcodes.insert(0x58 + x, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, OpcodeFlags::NONE));
+            opcodes.insert(0x50 + x, Opcode::new(Rc::new(Self::push), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+            opcodes.insert(0x58 + x, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
         }
-        opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::NONE));
-        opcodes.insert(0xE8, Opcode::new(Rc::new(Self::call), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::FORCE_WORD));
-        opcodes.insert(0xC3, Opcode::new(Rc::new(Self::ret), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::FORCE_WORD));
+        opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xE8, Opcode::new(Rc::new(Self::call), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
+        opcodes.insert(0xC3, Opcode::new(Rc::new(Self::ret), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
         // Jump opcodes
-        opcodes.insert(0xE9, Opcode::new(Rc::new(Self::jmp), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::IMMEDIATE));
+        opcodes.insert(0xE9, Opcode::new(Rc::new(Self::jmp), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate.into()));
         let flag_condition: Vec<Box<dyn Fn(&Self) -> bool>> = vec![Box::new(|this: &Self| this.check_flag(CPUFlags::OVERFLOW)), Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY)}),
                                 Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}),
                                 Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY) || this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY) && !this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN)}),
@@ -219,13 +242,13 @@ impl CPU {
                                 Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN) && !this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)})];
         let mut i = 0;
         for condition in flag_condition {
-            opcodes.insert(0x70 + i, Opcode::new(Self::cond_jmp(condition), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::IMMEDIATE | OpcodeFlags::SIZE_MISMATCH));
+            opcodes.insert(0x70 + i, Opcode::new(Self::cond_jmp(condition), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
             i += 1;
         }
         // Interrupt opcodes
-        opcodes.insert(0xCD, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::IMMEDIATE | OpcodeFlags::FORCE_BYTE));
-        opcodes.insert(0xCC, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::IMMEDIATE));
-        opcodes.insert(0xCF, Opcode::new(Rc::new(Self::iret), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::NONE));
+        opcodes.insert(0xCD, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
+        opcodes.insert(0xCC, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::Immediate.into()));
+        opcodes.insert(0xCF, Opcode::new(Rc::new(Self::iret), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
 
         Self {
             ram,
@@ -253,7 +276,7 @@ impl CPU {
         } else if let Some(_) = self.irq {
             self.next_cycles += self.int();
         } else {
-            let opcode_address =  (self.regs[Regs::CS], self.regs[Regs::IP]);
+            let opcode_address =  (self.regs[&Regs::CS].value, self.regs[&Regs::IP].value);
             self.opcode_address = opcode_address;
             let seg: Option<Regs> = None;
             let code = self.read_ip();
@@ -267,10 +290,10 @@ impl CPU {
             } else {
                 seg.unwrap()
             };
-            let immediate = opcode.has_flag(OpcodeFlags::IMMEDIATE).unwrap();
-            let size_mismatch = opcode.has_flag(OpcodeFlags::SIZE_MISMATCH).unwrap();
-            let force_word = opcode.has_flag(OpcodeFlags::FORCE_WORD).unwrap();
-            let force_byte = opcode.has_flag(OpcodeFlags::FORCE_BYTE).unwrap();
+            let immediate = opcode.has_flag(OpcodeFlags::Immediate.into());
+            let size_mismatch = opcode.has_flag(OpcodeFlags::SizeMismatch.into());
+            let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
+            let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
             let num_args = opcode.num_args;
             let shorthand = opcode.shorthand.clone();
 
@@ -755,7 +778,7 @@ impl CPU {
 
     fn check_carry_16_bit(&mut self, arg1: u16, arg2: u16) {
         if (arg1 as u32) + (arg2 as u32) > 65535 {
-            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= (CPUFlags::CARRY | CPUFlags::OVERFLOW);
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::CARRY | CPUFlags::OVERFLOW;
         } else {
             self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !(CPUFlags::CARRY | CPUFlags::OVERFLOW);
         }
@@ -835,7 +858,7 @@ impl CPU {
     pub fn run_to_nop(&mut self, loc: u16) {
         self.regs.get_mut(&Regs::IP).unwrap().value = loc;
         self.step();
-        while match self.instruction.clone() { Some(instruction) => instruction.flags & OpcodeFlags::NOP == 0, None => true } {
+        while match self.instruction.clone() { Some(instruction) => !instruction.has_flag(OpcodeFlags::Nop.into()), None => true } {
             self.step();
         }
     }

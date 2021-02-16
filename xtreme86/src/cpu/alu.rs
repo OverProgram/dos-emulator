@@ -194,10 +194,12 @@ impl CPU {
 
     pub fn aaa(&mut self) -> usize {
         let al = self.get_reg_8(0).unwrap();
-        if al & 0x0F > 9 || self.regs[CPUFlags::AUX_CARRY] == 1 {
-            self.regs.get_mut(&Regs::AX).unwrap().set_high(self.regs.get(&Regs::AX).unwrap().get_high() + 1);
-            self.regs.get_mut(&Regs::AX).unwrap().set_high(self.regs.get(&Regs::AX).unwrap().get_high() + 6);
-            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= (CPUFlags::AUX_CARRY | CPUFlags::CARRY);
+        if al & 0x0F > 9 || self.regs[&Regs::FLAGS].value & CPUFlags::AUX_CARRY > 0 {
+            let ax = self.regs.get_mut(&Regs::AX).unwrap();
+            let (ax_high, ax_low) = (ax.get_high(), ax.get_low());
+            ax.set_high(ax_high + 1);
+            ax.set_low(ax_low + 6);
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::AUX_CARRY | CPUFlags::CARRY;
         } else {
             self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !(CPUFlags::AUX_CARRY | CPUFlags::CARRY);
         }

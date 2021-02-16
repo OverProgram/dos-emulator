@@ -1,6 +1,9 @@
+extern crate enumflags2;
+
 use std::fs::File;
 use std::fs;
 use std::io::Read;
+use std::path::PathBuf;
 
 pub mod cpu;
 
@@ -12,8 +15,12 @@ fn new_cpu_from_file(filename: &str) -> cpu::CPU {
     computer.set_reg(cpu::Regs::SP, 0xFFFF);
     computer.set_reg(cpu::Regs::IP, 0x0000);
 
-    let mut f = File::open(&filename).expect("No file found!");
-    let metadata = fs::metadata(&filename).expect("No file found!");
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("..");
+    path.push(filename);
+
+    let mut f = File::open(&path).expect("No file found!");
+    let metadata = fs::metadata(&path).expect("No file found!");
     let mut buffer = vec![0; metadata.len() as usize];
     f.read(&mut buffer).expect("Couldn't read file!");
     computer.load(buffer, 0x103F0);
