@@ -10,3 +10,4 @@ edition = "2018"
 name = "xtreme86"
 
 [dependencies]
+enumflags2 = "^0.6"
