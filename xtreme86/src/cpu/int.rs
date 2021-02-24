@@ -8,7 +8,7 @@ impl CPU {
     }
 
     fn get_int_num(&mut self) -> u8 {
-        match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+        match self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Byte(val) => Some(val),
             SrcArg::Word(_) => None
         }.unwrap()

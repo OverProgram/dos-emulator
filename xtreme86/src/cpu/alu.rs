@@ -86,7 +86,7 @@ impl CPU {
 
     pub fn inc(&mut self) -> usize {
         // self.check_carry_add(SrcArg::Byte(1));
-        match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+        match self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Byte(dst) => self.set_flag_if(CPUFlags::OVERFLOW, dst as u16 + 1 > 255),
             SrcArg::Word(dst) => self.set_flag_if(CPUFlags::OVERFLOW, dst as u32 + 1 > 65535)
 
@@ -118,7 +118,7 @@ impl CPU {
 
     pub fn mul(&mut self) -> usize {
         let operand = self.regs.get(&Regs::AX).unwrap().value;
-        let (result_low, result_high, is_word) = match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+        let (result_low, result_high, is_word) = match self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Byte(val) => {
                 ((val as u16) * (operand & 0xFF), 0, false)
             }
@@ -136,7 +136,7 @@ impl CPU {
 
     pub fn imul(&mut self) -> usize {
         let operand = self.regs.get(&Regs::AX).unwrap().value as i16;
-        let (result_low, result_high, is_word) = match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+        let (result_low, result_high, is_word) = match self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Byte(val) => {
                 ((val as i16) * (operand & 0xFF), 0, false)
             }
@@ -153,7 +153,7 @@ impl CPU {
     }
 
     pub fn div(&mut self) -> usize {
-        match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+        match self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Byte(val) => {
                 let operand = self.get_reg_16(0).unwrap();
                 let result_div = (operand / (val as u16)) as u8;
@@ -173,7 +173,7 @@ impl CPU {
     }
 
     pub fn idiv(&mut self) -> usize {
-        match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+        match self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Byte(val) => {
                 let operand = self.get_reg_16(0).unwrap() as i16;
                 let result_div = (operand / (val as i16)) as i8;

@@ -3,7 +3,7 @@ use crate::cpu::{Regs, DstArg, SrcArg};
 
 impl CPU {
     pub fn push(&mut self) -> usize {
-        let arg = self.get_src_arg(self.dst.clone().unwrap()).unwrap();
+        let arg = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap();
         self.seg = Regs::SS;
         self.write_to_arg(DstArg::Ptr16(self.read_reg(Regs::SP).unwrap() - 1), arg).expect("Err");
         self.regs.get_mut(&Regs::SP).unwrap().value -= 2;

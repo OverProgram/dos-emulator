@@ -10,6 +10,7 @@ use std::rc::Rc;
 use enumflags2::BitFlags;
 use std::fmt::{Debug, Formatter};
 use std::fmt;
+use crate::cpu::reg::Reg;
 
 // struct OpcodeFlags;
 //
@@ -278,120 +279,130 @@ impl CPU {
         } else {
             let opcode_address =  (self.regs[&Regs::CS].value, self.regs[&Regs::IP].value);
             self.opcode_address = opcode_address;
-            let seg: Option<Regs> = None;
-            let code = self.read_ip();
-            let d = (code & 0x02) >> 1;
-            let mut s = (code & 0x01) >> 0;
-            let opcode = self.get_opcode(&code).clone();
-            self.instruction = Some(opcode.clone());
-            self.next_cycles += opcode.cycles;
-            self.seg = if let None = seg {
-                opcode.segment
-            } else {
-                seg.unwrap()
-            };
-            let immediate = opcode.has_flag(OpcodeFlags::Immediate.into());
-            let size_mismatch = opcode.has_flag(OpcodeFlags::SizeMismatch.into());
-            let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
-            let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
-            let num_args = opcode.num_args;
-            let shorthand = opcode.shorthand.clone();
-
-            if let Some((arg1, arg2)) = opcode.shorthand.clone() {
-                let arg1_translated = Some(self.translate_placeholder(arg1, s));
-                s = match arg1_translated.clone().unwrap() {
-                    DstArg::Reg8(_) => 0,
-                    DstArg::Reg16(_) => 1,
-                    _ => s
-                };
-                let mut arg2_translated = None;
-                if let Some(arg) = arg2 {
-                    arg2_translated = Some(self.translate_placeholder(arg, s));
-                }
-                let one_arg = if let NumArgs::Two = num_args { false } else { true };
-                if d == 1 && !immediate && !one_arg {
-                    self.src = match arg1_translated {
-                        Some(arg) => self.get_src_arg(arg),
-                        None => None
-                    };
-                    self.dst = arg2_translated;
-                } else {
-                    self.src = match arg2_translated {
-                        Some(arg) => self.get_src_arg(arg),
-                        None => None
-                    };
-                    self.dst = arg1_translated;
-                }
-            }
-            match num_args {
-                NumArgs::Two => {
-                    if let None = shorthand {
-                        let mod_reg_rm = self.read_ip();
-                        let rm = (mod_reg_rm & 0x07) >> 0;
-                        let reg = (mod_reg_rm & 0x38) >> 3;
-                        let mod_bits = (mod_reg_rm & 0xC0) >> 6;
-                        let arg2 = {
-                            if let None = self.src {
-                                self.translate_mod_rm(mod_bits, rm, s)
-                            } else {
-                                None
-                            }
-                        };
-                        let arg1 = if immediate {
-                            Some(
-                                if ((s == 1 && !size_mismatch) || force_word) && !force_byte {
-                                    DstArg::Imm16(self.read_ip_word())
-                                } else {
-                                    DstArg::Imm8(self.read_ip())
-                                }
-                            )
-                        } else {
-                            Some(Self::reg_to_arg(reg, s))
-                        };
-
-                        if d == 0 || immediate {
-                            if let None = self.src {
-                                self.src = self.get_src_arg(arg1.unwrap());
-                            }
-                            if let None = self.dst {
-                                self.dst = arg2;
-                            }
-                        } else {
-                            if let None = self.src {
-                                self.src = self.get_src_arg(arg2.unwrap());
-                            }
-                            if let None = self.dst {
-                                self.dst = arg1;
-                            }
-                        }
-
-                        self.reg_bits = reg;
-                    }
-                },
-                NumArgs::One => {
-                    if let None = self.dst {
-                        if immediate {
-                            self.dst = Some(if ((d == 0 && !size_mismatch) || force_word) && !force_byte {
-                                DstArg::Imm16(self.read_ip_word())
-                            } else {
-                                DstArg::Imm8(self.read_ip())
-                            })
-                        } else {
-                            let mod_reg_rm = self.read_ip();
-                            let rm = (mod_reg_rm & 0x07) >> 0;
-                            let mod_bits = (mod_reg_rm & 0xC0) >> 6;
-                            let arg = self.translate_mod_rm(mod_bits, rm, s);
-                            self.dst = arg;
-                            self.reg_bits = (mod_reg_rm & 0x38) >> 3;
-                        }
-                    }
-                },
-                NumArgs::Zero => ()
-            }
+            let (instruction, dst, src, next_cycles, ip_offset, reg_bits) = self.decode_instruction(self.regs.get(&Regs::IP).unwrap().value as usize);
+            self.instruction = instruction;
+            self.dst = dst;
+            self.src = src;
+            self.reg_bits = reg_bits;
+            self.next_cycles = next_cycles;
+            self.regs.get_mut(&Regs::IP).unwrap().value = ip_offset as u16;
         }
     }
 
-    fn get_opcode(&mut self, code: &u8) -> &Opcode {
+    fn decode_instruction(&self, loc: usize) -> (Option<Opcode>, Option<DstArg>, Option<SrcArg>, usize, u16, u8) {
+        let mut next_cycles = 0;
+        let mut ip_tmp = loc;
+        let code = self.read_ip(&mut ip_tmp, &mut next_cycles);
+        let d = (code & 0x02) >> 1;
+        let mut s = (code & 0x01) >> 0;
+        let opcode = self.get_opcode(&code).clone();
+        let instruction = Some(opcode.clone());
+        next_cycles += opcode.cycles;
+        let immediate = opcode.has_flag(OpcodeFlags::Immediate.into());
+        let size_mismatch = opcode.has_flag(OpcodeFlags::SizeMismatch.into());
+        let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
+        let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
+        let num_args = opcode.num_args;
+        let shorthand = opcode.shorthand.clone();
+        let mut src: Option<SrcArg> = None;
+        let mut dst: Option<DstArg> = None;
+        let mut reg_bits = 0;
+
+        if let Some((arg1, arg2)) = opcode.shorthand.clone() {
+            let arg1_translated = Some(self.translate_placeholder(arg1, s, &mut ip_tmp, &mut next_cycles));
+            s = match arg1_translated.clone().unwrap() {
+                DstArg::Reg8(_) => 0,
+                DstArg::Reg16(_) => 1,
+                _ => s
+            };
+            let mut arg2_translated = None;
+            if let Some(arg) = arg2 {
+                arg2_translated = Some(self.translate_placeholder(arg, s, &mut ip_tmp, &mut next_cycles));
+            }
+            let one_arg = if let NumArgs::Two = num_args { false } else { true };
+            if d == 1 && !immediate && !one_arg {
+                src = match arg1_translated {
+                    Some(arg) => self.get_src_arg(arg, &mut next_cycles),
+                    None => None
+                };
+                dst = arg2_translated;
+            } else {
+                src = match arg2_translated {
+                    Some(arg) => self.get_src_arg(arg, &mut next_cycles),
+                    None => None
+                };
+                dst = arg1_translated;
+            }
+        }
+        match num_args {
+            NumArgs::Two => {
+                if let None = shorthand {
+                    let mod_reg_rm = self.read_ip(&mut ip_tmp, &mut next_cycles);
+                    let rm = (mod_reg_rm & 0x07) >> 0;
+                    let reg = (mod_reg_rm & 0x38) >> 3;
+                    let mod_bits = (mod_reg_rm & 0xC0) >> 6;
+                    let arg2 = {
+                        if let None = self.src {
+                            self.translate_mod_rm(mod_bits, rm, s, &mut ip_tmp, &mut next_cycles)
+                        } else {
+                            None
+                        }
+                    };
+                    let arg1 = if immediate {
+                        Some(
+                            if ((s == 1 && !size_mismatch) || force_word) && !force_byte {
+                                DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles))
+                            } else {
+                                DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles))
+                            }
+                        )
+                    } else {
+                        Some(Self::reg_to_arg(reg, s))
+                    };
+
+                    if d == 0 || immediate {
+                        if let None = self.src {
+                            src = self.get_src_arg(arg1.unwrap(), &mut next_cycles);
+                        }
+                        if let None = self.dst {
+                            dst = arg2;
+                        }
+                    } else {
+                        if let None = self.src {
+                            src = self.get_src_arg(arg2.unwrap(), &mut next_cycles);
+                        }
+                        if let None = self.dst {
+                            dst = arg1;
+                        }
+                    }
+
+                    reg_bits = reg;
+                }
+            },
+            NumArgs::One => {
+                if let None = dst {
+                    if immediate {
+                        dst = Some(if ((d == 0 && !size_mismatch) || force_word) && !force_byte {
+                            DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles))
+                        } else {
+                            DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles))
+                        })
+                    } else {
+                        let mod_reg_rm = self.read_ip(&mut ip_tmp, &mut next_cycles);
+                        let rm = (mod_reg_rm & 0x07) >> 0;
+                        let mod_bits = (mod_reg_rm & 0xC0) >> 6;
+                        let arg = self.translate_mod_rm(mod_bits, rm, s, &mut ip_tmp, &mut next_cycles);
+                        dst = arg;
+                        reg_bits = (mod_reg_rm & 0x38) >> 3;
+                    }
+                }
+            },
+            NumArgs::Zero => ()
+        }
+        (Some(opcode), dst, src, next_cycles, ip_tmp as u16, reg_bits)
+    }
+
+    fn get_opcode(&self, code: &u8) -> &Opcode {
         match self.opcodes.get(&code) {
             Some(opcode) => opcode,
             None => match self.opcodes.get(&(code & 0xFD)) {
@@ -411,8 +422,7 @@ impl CPU {
                 self.regs.get_mut(&Regs::CS).unwrap().value = opcode_start.0;
                 self.regs.get_mut(&Regs::IP).unwrap().value = opcode_start.1;
             }
-            exceptions::INTO => {
-            }
+            exceptions::INTO => (),
             _ => return Err(String::from("Invalid exception code!"))
         }
 
@@ -428,7 +438,15 @@ impl CPU {
         self.regs[&Regs::FLAGS].value & flag1 != self.regs[&Regs::FLAGS].value & flag2
     }
 
-    fn read_ip(&mut self) -> u8 {
+    fn read_ip(&self, ip: &mut usize, next_cycles: &mut usize) -> u8 {
+        let tmp = *ip;
+        *ip += 1;
+        *next_cycles += 1;
+        let addr = Self::physical_address(self.regs.get(&Regs::CS).unwrap().value, tmp as u16);
+        self.ram[addr as usize]
+    }
+
+    fn read_ip_mut(&mut self) -> u8 {
         let addr = Self::physical_address(self.regs.get(&Regs::CS).unwrap().value, self.regs.get(&Regs::IP).unwrap().value);
         let val = self.ram[addr as usize];
         self.regs.get_mut(&Regs::IP).unwrap().value += 1;
@@ -448,7 +466,19 @@ impl CPU {
         }
     }
 
-    fn get_src_arg(&mut self, arg: DstArg) -> Option<SrcArg> {
+    fn get_src_arg(&self, arg: DstArg, next_cycles: &mut usize) -> Option<SrcArg> {
+        match arg {
+            DstArg::Reg8(reg) => Some(SrcArg::Byte(self.get_reg_8(reg)?)),
+            DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
+            DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
+            DstArg::Imm16(val) => Some(SrcArg::Word(val)),
+            DstArg::Ptr16(ptr) => { *next_cycles += 2; Some(SrcArg::Word(self.read_mem_word(ptr)?)) },
+            DstArg::Ptr8(ptr) => { *next_cycles += 1; Some(SrcArg::Byte(self.read_mem_byte(ptr)?)) },
+            DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
+        }
+    }
+
+    fn get_src_arg_mut(&mut self, arg: DstArg) -> Option<SrcArg> {
         match arg {
             DstArg::Reg8(reg) => Some(SrcArg::Byte(self.get_reg_8(reg)?)),
             DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
@@ -459,8 +489,20 @@ impl CPU {
             DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
         }
     }
+    
+    fn read_mem_byte(&self, ptr: u16) -> Option<u8> {
+        if ptr > self.ram.len() as u16 {
+            None
+        } else {
+            Some(self.ram[Self::physical_address(self.read_reg(self.seg).unwrap(), ptr) as usize])
+        }
+    }
 
-    fn read_mem_byte(&mut self, ptr: u16) -> Option<u8> {
+    fn read_mem_word(&self, ptr: u16) -> Option<u16> {
+        Some((self.read_mem_byte(ptr)? as u16) | ((self.read_mem_byte(ptr + 1)? as u16) << 8))
+    }
+
+    fn read_mem_byte_mut(&mut self, ptr: u16) -> Option<u8> {
         if ptr > self.ram.len() as u16 {
             None
         } else {
@@ -469,8 +511,8 @@ impl CPU {
         }
     }
 
-    fn read_mem_word(&mut self, ptr: u16) -> Option<u16> {
-        Some((self.read_mem_byte(ptr)? as u16) | ((self.read_mem_byte(ptr + 1)? as u16) << 8))
+    fn read_mem_word_mut(&mut self, ptr: u16) -> Option<u16> {
+        Some((self.read_mem_byte_mut(ptr)? as u16) | ((self.read_mem_byte_mut(ptr + 1)? as u16) << 8))
     }
 
     fn write_mem_byte(&mut self, ptr: u16, val: u8) -> Result<(), &str> {
@@ -518,15 +560,19 @@ impl CPU {
         self.write_mem_byte_seg(ptr, seg, ((ptr & 0xFF00) >> 8) as u8)
     }
 
-    fn read_ip_word(&mut self) -> u16 {
-        (self.read_ip() as u16) | ((self.read_ip() as u16) << 8)
+    fn read_ip_word(&self, ip: &mut usize, next_cycles: &mut usize) -> u16 {
+        (self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8)
+    }
+
+    fn read_ip_word_mut(&mut self) -> u16 {
+        (self.read_ip_mut() as u16) | ((self.read_ip_mut() as u16) << 8)
     }
 
     fn write_to_arg(&mut self, arg: DstArg, val_arg: SrcArg) -> Result<(), &str> {
         match arg {
             DstArg::Reg16(reg) => {
                 self.regs.get_mut(&Self::translate_reg16(reg).unwrap()).unwrap().value = if let SrcArg::Word(value) = val_arg {
-                        value
+                    value
                     } else {
                         return Err("Mismatch operand sizes");
                     };
@@ -569,9 +615,9 @@ impl CPU {
         }
     }
 
-    fn translate_mod_rm(&mut self, mod_bits: u8, rm: u8, s: u8) -> Option<DstArg> {
+    fn translate_mod_rm(&self, mod_bits: u8, rm: u8, s: u8, ip: &mut usize, next_cycles: &mut usize) -> Option<DstArg> {
         if mod_bits == 0b00 && rm == 0b110 {
-            Some(if s == 1{ DstArg::Ptr16(self.read_ip_word()) } else { DstArg::Ptr8(self.read_ip_word()) })
+            Some(if s == 1{ DstArg::Ptr16(self.read_ip_word(ip, next_cycles)) } else { DstArg::Ptr8(self.read_ip_word(ip, next_cycles)) })
         } else {
             let (reg1, reg2) = match rm {
                 0b000 => Some((Regs::BX, Some(Regs::SI))),
@@ -592,16 +638,16 @@ impl CPU {
             if s == 1 {
                 match mod_bits {
                     0 => Some(DstArg::Ptr16(ptr_val)),
-                    1 => Some(DstArg::Ptr16(ptr_val + (self.read_ip() as u16))),
-                    2 => Some(DstArg::Ptr16(ptr_val + (self.read_ip_word()))),
+                    1 => Some(DstArg::Ptr16(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
+                    2 => Some(DstArg::Ptr16(ptr_val + (self.read_ip_word(ip, next_cycles)))),
                     3 => Some(Self::reg_to_arg(rm, s)),
                     _ => None
                 }
             } else {
                 match mod_bits {
                     0 => Some(DstArg::Ptr8(ptr_val)),
-                    1 => Some(DstArg::Ptr8(ptr_val + (self.read_ip() as u16))),
-                    2 => Some(DstArg::Ptr8(ptr_val + (self.read_ip_word()))),
+                    1 => Some(DstArg::Ptr8(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
+                    2 => Some(DstArg::Ptr8(ptr_val + (self.read_ip_word(ip, next_cycles)))),
                     3 => Some(Self::reg_to_arg(rm, s)),
                     _ => None
                 }
@@ -609,7 +655,7 @@ impl CPU {
         }
     }
 
-    fn translate_placeholder(&mut self, placeholder: Placeholder, s: u8) -> DstArg {
+    fn translate_placeholder(&self, placeholder: Placeholder, s: u8, ip: &mut usize, next_cycles: &mut usize) -> DstArg {
         match placeholder {
             Placeholder::Reg(reg) => {
                 if s == 1 {
@@ -620,16 +666,16 @@ impl CPU {
             },
             Placeholder::Imm => {
                 if s == 1 {
-                    DstArg::Imm16((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
+                    DstArg::Imm16((self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8))
                 } else {
-                    DstArg::Imm8(self.read_ip())
+                    DstArg::Imm8(self.read_ip(ip, next_cycles))
                 }
             }
             Placeholder::Reg8(reg) => DstArg::Reg8(reg),
             Placeholder::Reg16(reg) => DstArg::Reg16(reg),
             Placeholder::Word(val) => DstArg::Imm16(val),
             Placeholder::Byte(val) => DstArg::Imm8(val),
-            Placeholder::Ptr => DstArg::Ptr16((self.read_ip() as u16) | ((self.read_ip() as u16) << 8))
+            Placeholder::Ptr => DstArg::Ptr16((self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8))
         }
     }
 
@@ -637,7 +683,7 @@ impl CPU {
         T: Fn(u8)-> u8,
         U: Fn(u16) -> u16
     {
-        match self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+        match self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Word(dst) => {
                 Some(SrcArg::Word(word(dst)))
             },
@@ -653,16 +699,16 @@ impl CPU {
     {
         match self.src.clone().unwrap() {
             SrcArg::Word(src) => {
-                if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
                     Some(SrcArg::Word(word(src, dst)))
                 } else {
                     None
                 }
             },
             SrcArg::Byte(src) => {
-                if let SrcArg::Byte(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Byte(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
                     Some(SrcArg::Byte(byte(src, dst)))
-                } else if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                } else if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
                     Some(SrcArg::Word(word(src as u16, dst)))
                 } else {
                     None
@@ -688,14 +734,14 @@ impl CPU {
     fn check_carry_add(&mut self, arg: SrcArg) {
         match arg {
             SrcArg::Word(src) => {
-                if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
                     self.check_carry_16_bit(src, dst);
                 }
             },
             SrcArg::Byte(src) => {
-                if let SrcArg::Byte(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Byte(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
                     self.check_carry_8_bit(src, dst);
-                } else if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                } else if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
                     self.check_carry_16_bit(src as u16, dst);
                 }
             }
@@ -762,14 +808,14 @@ impl CPU {
     fn check_carry_sub(&mut self, arg: SrcArg) {
         match arg {
             SrcArg::Word(src) => {
-                if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
                     self.check_carry_16_bit(dst, Self::twos_compliment_word(src));
                 }
             },
             SrcArg::Byte(src) => {
-                if let SrcArg::Byte(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Byte(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
                     self.check_carry_8_bit(dst, Self::twos_compliment_byte(src));
-                } else if let SrcArg::Word(dst) = self.get_src_arg(self.dst.clone().unwrap()).unwrap() {
+                } else if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
                     self.check_carry_16_bit(dst, Self::twos_compliment_word(src as u16));
                 }
             }
