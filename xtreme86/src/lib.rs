@@ -70,7 +70,7 @@ mod mov_test {
 mod test_alu {
     use super::cpu;
     use crate::cpu::Regs;
-    use crate::new_cpu_vec;
+    use crate::{new_cpu_vec, new_cpu_from_file};
 
     #[test]
     fn test_add() {
@@ -155,6 +155,12 @@ mod test_alu {
         computer.execute_next();
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0xab00);
         assert_eq!(computer.read_reg(Regs::DX).unwrap(), 0x0055);
+    }
+
+    fn test_misc() {
+        let mut computer = new_cpu_from_file("tests/objs/alu.out");
+        computer.run_to_nop(0);
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x08);
     }
 }
 
