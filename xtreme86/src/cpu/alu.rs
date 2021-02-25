@@ -13,6 +13,17 @@ impl CPU {
         }
     }
 
+    pub fn alu_dispatch_two_args_mnemonic(reg_bits: u8) -> Option<String> {
+        Some(String::from(match reg_bits {
+            0b000 => "ADD",
+            0b001 => "OR",
+            0b100 => "AND",
+            0b101 => "SUB",
+            0b110 => "XOR",
+            _ => return None
+        }))
+    }
+
     pub fn alu_dispatch_one_arg(&mut self) -> usize {
         match self.reg_bits {
             0b000 => self.inc(),
@@ -20,6 +31,15 @@ impl CPU {
             0b110 => self.push(),
             _ => 0
         }
+    }
+
+    pub fn alu_dispatch_one_arg_mnemonic(reg_bits: u8) -> Option<String> {
+        Some(String::from(match reg_bits {
+            0b000 => "INC",
+            0b001 => "DEC",
+            0b110 => "PUSH",
+            _ => return None
+        }))
     }
 
     pub fn mul_dispatch(&mut self) -> usize {
@@ -34,12 +54,28 @@ impl CPU {
         }
     }
 
+    pub fn mul_dispatch_mnemonic(reg_bits: u8) -> Option<String> {
+        Some(String::from(match reg_bits {
+            0b010 => "NOT",
+            0b011 => "NEG",
+            0b100 => "MUL",
+            0b101 => "IMUL",
+            0b110 => "DIV",
+            0b111 => "IDIV",
+            _ => return None
+        }))
+    }
+
     pub fn add(&mut self) -> usize {
         self.check_carry_add(self.src.clone().unwrap());
         let sum = self.operation_2_args(|src, dst| Self::add_with_carry_8_bit(dst, src), |src, dst| Self::add_with_carry_16_bit(dst, src));
         self.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
         self.write_to_arg(self.dst.clone().unwrap(), sum).unwrap();
         0
+    }
+
+    pub fn add_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("ADD"))
     }
 
     pub fn sub(&mut self) -> usize {
@@ -50,11 +86,19 @@ impl CPU {
         0
     }
 
+    pub fn sub_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("SUB"))
+    }
+
     pub fn and(&mut self) -> usize {
         let result = self.operation_2_args(|src, dst| dst & src, |src, dst| dst & src);
         self.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
         self.write_to_arg(self.dst.clone().unwrap(), result).unwrap();
         0
+    }
+
+    pub fn and_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("AND"))
     }
 
     pub fn or(&mut self) -> usize {
@@ -64,11 +108,19 @@ impl CPU {
         0
     }
 
+    pub fn or_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("OR"))
+    }
+
     pub fn xor(&mut self) -> usize {
         let result = self.operation_2_args(|src, dst| dst ^ src, |src, dst| dst ^ src);
         self.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
         self.write_to_arg(self.dst.clone().unwrap(), result).unwrap();
         0
+    }
+
+    pub fn xor_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("XOR"))
     }
 
     pub fn not(&mut self) -> usize {
@@ -101,11 +153,19 @@ impl CPU {
         0
     }
 
+    pub fn inc_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("INC"))
+    }
+
     pub fn dec(&mut self) -> usize {
         let sum = self.operation_1_arg(|dst| Self::sub_with_carry_8_bit(dst, 1), |dst| Self::sub_with_carry_16_bit(dst, 1));
         self.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
         self.write_to_arg(self.dst.clone().unwrap(), sum).unwrap();
         0
+    }
+
+    pub fn dec_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("DEC"))
     }
 
     fn set_overflow(&mut self, result_high: u16) {
@@ -204,5 +264,9 @@ impl CPU {
             self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !(CPUFlags::AUX_CARRY | CPUFlags::CARRY);
         }
         0
+    }
+
+    pub fn aaa_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("AAA"))
     }
 }

@@ -6,7 +6,15 @@ impl CPU {
         0
     }
 
+    pub fn mov_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("MOV"))
+    }
+
     pub fn nop(&mut self) -> usize {
         0
+    }
+
+    pub fn nop_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("NOP"))
     }
 }

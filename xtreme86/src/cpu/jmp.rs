@@ -17,12 +17,22 @@ impl CPU {
         0
     }
 
+    pub fn jmp_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("JMP"))
+    }
+
     pub fn cond_jmp(condition: Box<dyn Fn(&Self) -> bool>) -> Rc<dyn Fn(&mut Self) -> usize> {
-        return Rc::new(move |this| {
+        Rc::new(move |this| {
             if condition(this) {
                 this.jmp();
             }
             0
-        });
+        })
+    }
+
+    pub fn cond_jmp_mnemonic(cond_text: String) -> Rc<dyn Fn(u8) -> Option<String>> {
+        Rc::new(|_| {
+            Some(format!("J{}", cond_text))
+        })
     }
 }

@@ -12,17 +12,6 @@ use std::fmt::{Debug, Formatter};
 use std::fmt;
 use crate::cpu::reg::Reg;
 
-// struct OpcodeFlags;
-//
-// impl OpcodeFlags {
-//     const NONE: u32 = 0x00;
-//     const IMMEDIATE: u32 = 0x01;
-//     const SIZE_MISMATCH: u32 = 0x02;
-//     const NOP: u32 = 0x04;
-//     const FORCE_WORD: u32 = 0x08;
-//     const FORCE_BYTE: u32 = 0x10;
-// }
-
 #[derive(BitFlags, Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
 enum OpcodeFlags {
@@ -77,6 +66,20 @@ enum DstArg {
     Reg(Regs)
 }
 
+impl DstArg {
+    fn to_text(&self) -> String {
+        match self {
+            DstArg::Reg8(id) => Regs::id_8_bit_to_text(*id),
+            DstArg::Reg16(id) => Regs::translate_reg16(*id).unwrap().to_text(),
+            DstArg::Imm8(val) => val.to_string(),
+            DstArg::Imm16(val) => val.to_string(),
+            DstArg::Ptr16(val) => format!("[WORD PTR {}]", val),
+            DstArg::Ptr8(val) => format!("[BYTE PTR {}]", val),
+            DstArg::Reg(reg) => reg.to_text()
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 enum SrcArg {
     Byte(u8),
@@ -112,6 +115,59 @@ pub enum Regs {
     FLAGS
 }
 
+impl Regs {
+    fn to_text(&self) -> String {
+        String::from(match self {
+            Regs::AX => "AX",
+            Regs::BX => "BX",
+            Regs::CX => "CX",
+            Regs::DX => "DX",
+            Regs::SI => "SI",
+            Regs::DI => "DI",
+            Regs::SP => "SP",
+            Regs::BP => "BP",
+            Regs::ES => "ES",
+            Regs::CS => "CS",
+            Regs::SS => "SS",
+            Regs::DS => "DS",
+            Regs::IP => "IP",
+            Regs::FLAGS => "FLAGS"
+        })
+    }
+
+    fn id_8_bit_to_text(id: u8) -> String {
+        String::from(match id {
+            0 => "AL",
+            1 => "CL",
+            2 => "DL",
+            3 => "BL",
+            4 => "AH",
+            5 => "CH",
+            6 => "DH",
+            7 => "BH",
+            _ => ""
+        })
+    }
+
+    fn translate_reg16(num: u8) -> Option<Self> {
+        match num {
+            0 => Some(Regs::AX),
+            1 => Some(Regs::CX),
+            2 => Some(Regs::DX),
+            3 => Some(Regs::BX),
+            4 => Some(Regs::SP),
+            5 => Some(Regs::BP),
+            6 => Some(Regs::SI),
+            7 => Some(Regs::DI),
+            _ => None
+        }
+    }
+
+    fn translate_reg8(num: u8) -> Option<(Self, WordPart)> {
+        Some((Self::translate_reg16(num % 4)?, if num % 2 == 0 { WordPart::Low } else { WordPart::High }))
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 enum WordPart {
     Low,
@@ -125,18 +181,20 @@ struct Opcode {
     cycles: usize,
     shorthand: Option<(Placeholder, Option<Placeholder>)>,
     flags: BitFlags<OpcodeFlags>,
-    segment: Regs
+    segment: Regs,
+    mnemonic: Rc<dyn Fn(u8) -> Option<String>>
 }
 
 impl Opcode {
-    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, segment: Regs, flags: BitFlags<OpcodeFlags>) -> Self {
+    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, mnemonic: Rc<dyn Fn(u8) -> Option<String>>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, segment: Regs, flags: BitFlags<OpcodeFlags>) -> Self {
         Self {
             instruction,
             num_args,
             cycles,
             shorthand,
             flags,
-            segment
+            segment,
+            mnemonic
         }
     }
 
@@ -197,59 +255,59 @@ impl CPU {
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
         //NOP
-        opcodes.insert(0x90, Opcode::new(Rc::new(Self::nop), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::Nop.into()));
+        opcodes.insert(0x90, Opcode::new(Rc::new(Self::nop), Rc::new(Self::nop_mnemonic), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::Nop.into()));
         // Move opcodes
-        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), Regs::DS, BitFlags::empty()));
+        opcodes.insert(0x88, Opcode::new(Rc::new(Self::mov), Rc::new(Self::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xA0, Opcode::new(Rc::new(Self::mov), Rc::new(Self::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), Regs::DS, BitFlags::empty()));
         for x in 0..7 {
-            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))),Regs::DS, OpcodeFlags::Immediate.into()));
-            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
+            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(Self::mov), Rc::new(Self::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))),Regs::DS, OpcodeFlags::Immediate.into()));
+            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(Self::mov), Rc::new(Self::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
         }
-        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
+        opcodes.insert(0xC6, Opcode::new(Rc::new(Self::mov), Rc::new(Self::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
         // ALU opcodes
-        let mut alu_opcodes: Vec<(Rc<dyn Fn(&mut CPU) -> usize>, u8)> = Vec::new();
-        alu_opcodes.push((Rc::new(Self::add), 0x00));
-        alu_opcodes.push((Rc::new(Self::sub), 0x28));
-        alu_opcodes.push((Rc::new(Self::xor), 0x30));
-        alu_opcodes.push((Rc::new(Self::and), 0x20));
-        alu_opcodes.push((Rc::new(Self::or), 0x08));
-        for (instruction, offset) in alu_opcodes.into_iter() {
-            opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
-            opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
+        let mut alu_opcodes: Vec<(Rc<dyn Fn(&mut CPU) -> usize>, Rc<dyn Fn(&mut Self) -> usize>, u8)> = Vec::new();
+        alu_opcodes.push((Rc::new(Self::add), Rc::new(Self::add_mnemonic), 0x00));
+        alu_opcodes.push((Rc::new(Self::sub), Rc::new(Self::sub_mnemonic), 0x28));
+        alu_opcodes.push((Rc::new(Self::xor), Rc::new(Self::xor_mnemonic), 0x30));
+        alu_opcodes.push((Rc::new(Self::and), Rc::new(Self::and_mnemonic), 0x20));
+        alu_opcodes.push((Rc::new(Self::or), Rc::new(Self::or_mnemonic), 0x08));
+        for (instruction, mnemonic, offset) in alu_opcodes.into_iter() {
+            opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), mnemonic, NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
+            opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), mnemonic.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
         }
-        opcodes.insert(0x80, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
+        opcodes.insert(0x80, Opcode::new(Rc::new(Self::alu_dispatch_two_args), Rc::new(Self::alu_dispatch_two_args_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
         for x in 0..7 {
-            opcodes.insert(0x40 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
-            opcodes.insert(0x48 + x, Opcode::new(Rc::new(Self::inc), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+            opcodes.insert(0x40 + x, Opcode::new(Rc::new(Self::inc),Rc::new(Self::inc_mnemonic), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+            opcodes.insert(0x48 + x, Opcode::new(Rc::new(Self::dec), Rc::new(Self::dec_mnemonic), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
         }
-        opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch_two_args), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
-        opcodes.insert(0xFE, Opcode::new(Rc::new(Self::alu_dispatch_one_arg), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xF6, Opcode::new(Rc::new(Self::mul_dispatch), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0x83, Opcode::new(Rc::new(Self::alu_dispatch_two_args), Rc::new(Self::alu_dispatch_two_args_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
+        opcodes.insert(0xFE, Opcode::new(Rc::new(Self::alu_dispatch_one_arg), Rc::new(Self::alu_dispatch_one_arg_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xF6, Opcode::new(Rc::new(Self::mul_dispatch), Rc::new(Self::mul_dispatch_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
         // Stack opcodes
         for x in 0..7 {
-            opcodes.insert(0x50 + x, Opcode::new(Rc::new(Self::push), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
-            opcodes.insert(0x58 + x, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+            opcodes.insert(0x50 + x, Opcode::new(Rc::new(Self::push), Rc::new(Self::push_mnemonic), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+            opcodes.insert(0x58 + x, Opcode::new(Rc::new(Self::pop), Rc::new(Self::pop_mnemonic), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
         }
-        opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xE8, Opcode::new(Rc::new(Self::call), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
-        opcodes.insert(0xC3, Opcode::new(Rc::new(Self::ret), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
+        opcodes.insert(0x8F, Opcode::new(Rc::new(Self::pop), Rc::new(Self::pop_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xE8, Opcode::new(Rc::new(Self::call), Rc::new(Self::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
+        opcodes.insert(0xC3, Opcode::new(Rc::new(Self::ret), Rc::new(Self::ret_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
         // Jump opcodes
-        opcodes.insert(0xE9, Opcode::new(Rc::new(Self::jmp), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate.into()));
-        let flag_condition: Vec<Box<dyn Fn(&Self) -> bool>> = vec![Box::new(|this: &Self| this.check_flag(CPUFlags::OVERFLOW)), Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY)}),
-                                Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}),
-                                Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY) || this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY) && !this.check_flag(CPUFlags::ZERO)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN)}),
-                                Box::new(|this: &Self| {!this.check_flag(CPUFlags::SIGN)}), Box::new(|this: &Self| {this.check_flag(CPUFlags::PARITY)}), Box::new(|this: &Self| {this.check_flag(!CPUFlags::PARITY)}),
-                                Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {!this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW) || this.check_flag(CPUFlags::ZERO)}),
-                                Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN) && !this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)})];
+        opcodes.insert(0xE9, Opcode::new(Rc::new(Self::jmp), Rc::new(Self::jmp_mnemonic), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate.into()));
+        let flag_condition: Vec<(Box<dyn Fn(&Self) -> bool>, String)> = vec![(Box::new(|this: &Self| this.check_flag(CPUFlags::OVERFLOW)), String::from("O")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}), String::from("NO")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY)}), String::from("C")),
+                                                                                                                                                                (Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY)}), String::from("C")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::ZERO)}), String::from("E")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::ZERO)}), String::from("NE")),
+                                                                                                                                                                (Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY) || this.check_flag(CPUFlags::ZERO)}), String::from("BE")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY) && !this.check_flag(CPUFlags::ZERO)}), String::from("A")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN)}), String::from("S")),
+                                                                                                                                                                (Box::new(|this: &Self| {!this.check_flag(CPUFlags::SIGN)}), String::from("NS")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::PARITY)}), String::from("P")), (Box::new(|this: &Self| {this.check_flag(!CPUFlags::PARITY)}), String::from("NP")),
+                                                                                                                                                                (Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), String::from("L")), (Box::new(|this: &Self| {!this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), String::from("GE")), (Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW) || this.check_flag(CPUFlags::ZERO)}), String::from("LE")),
+                                                                                                                                                                (Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN) && !this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), String::from("G"))];
         let mut i = 0;
-        for condition in flag_condition {
-            opcodes.insert(0x70 + i, Opcode::new(Self::cond_jmp(condition), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
+        for (condition, cond_text) in flag_condition {
+            opcodes.insert(0x70 + i, Opcode::new(Self::cond_jmp(condition), Self::cond_jmp_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
             i += 1;
         }
         // Interrupt opcodes
-        opcodes.insert(0xCD, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
-        opcodes.insert(0xCC, Opcode::new(Rc::new(Self::int_req), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::Immediate.into()));
-        opcodes.insert(0xCF, Opcode::new(Rc::new(Self::iret), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xCD, Opcode::new(Rc::new(Self::int_req), Rc::new(Self::int_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
+        opcodes.insert(0xCC, Opcode::new(Rc::new(Self::int_req), Rc::new(Self::int_mnemonic), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::Immediate.into()));
+        opcodes.insert(0xCF, Opcode::new(Rc::new(Self::iret), Rc::new(Self::iret_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
 
         Self {
             ram,
@@ -282,21 +340,23 @@ impl CPU {
             let (instruction, dst, src, next_cycles, ip_offset, reg_bits) = self.decode_instruction(self.regs.get(&Regs::IP).unwrap().value as usize);
             self.instruction = instruction;
             self.dst = dst;
-            self.src = src;
+            self.src = match src {
+                Some(arg) => self.get_src_arg_mut(arg),
+                None => None
+            };
             self.reg_bits = reg_bits;
             self.next_cycles = next_cycles;
             self.regs.get_mut(&Regs::IP).unwrap().value = ip_offset as u16;
         }
     }
 
-    fn decode_instruction(&self, loc: usize) -> (Option<Opcode>, Option<DstArg>, Option<SrcArg>, usize, u16, u8) {
+    fn decode_instruction(&self, loc: usize) -> (Option<Opcode>, Option<DstArg>, Option<DstArg>, usize, u16, u8) {
         let mut next_cycles = 0;
         let mut ip_tmp = loc;
         let code = self.read_ip(&mut ip_tmp, &mut next_cycles);
         let d = (code & 0x02) >> 1;
         let mut s = (code & 0x01) >> 0;
         let opcode = self.get_opcode(&code).clone();
-        let instruction = Some(opcode.clone());
         next_cycles += opcode.cycles;
         let immediate = opcode.has_flag(OpcodeFlags::Immediate.into());
         let size_mismatch = opcode.has_flag(OpcodeFlags::SizeMismatch.into());
@@ -304,7 +364,7 @@ impl CPU {
         let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
         let num_args = opcode.num_args;
         let shorthand = opcode.shorthand.clone();
-        let mut src: Option<SrcArg> = None;
+        let mut src: Option<DstArg> = None;
         let mut dst: Option<DstArg> = None;
         let mut reg_bits = 0;
 
@@ -321,16 +381,10 @@ impl CPU {
             }
             let one_arg = if let NumArgs::Two = num_args { false } else { true };
             if d == 1 && !immediate && !one_arg {
-                src = match arg1_translated {
-                    Some(arg) => self.get_src_arg(arg, &mut next_cycles),
-                    None => None
-                };
+                src = arg1_translated;
                 dst = arg2_translated;
             } else {
-                src = match arg2_translated {
-                    Some(arg) => self.get_src_arg(arg, &mut next_cycles),
-                    None => None
-                };
+                src = arg2_translated;
                 dst = arg1_translated;
             }
         }
@@ -362,14 +416,14 @@ impl CPU {
 
                     if d == 0 || immediate {
                         if let None = self.src {
-                            src = self.get_src_arg(arg1.unwrap(), &mut next_cycles);
+                            src = arg1;
                         }
                         if let None = self.dst {
                             dst = arg2;
                         }
                     } else {
                         if let None = self.src {
-                            src = self.get_src_arg(arg2.unwrap(), &mut next_cycles);
+                            src = arg2;
                         }
                         if let None = self.dst {
                             dst = arg1;
@@ -455,11 +509,11 @@ impl CPU {
     }
 
     fn get_reg_16(&self, reg_num: u8) -> Option<u16> {
-        Some(self.regs.get(&Self::translate_reg16(reg_num)?)?.value)
+        Some(self.regs.get(&Regs::translate_reg16(reg_num)?)?.value)
     }
 
     fn get_reg_8(&self, reg_num: u8) -> Option<u8> {
-        let (reg, part) = Self::translate_reg8(reg_num)?;
+        let (reg, part) = Regs::translate_reg8(reg_num)?;
         match part {
             WordPart::High => Some(self.regs.get(&reg)?.get_high()),
             WordPart::Low => Some(self.regs.get(&reg)?.get_low())
@@ -571,7 +625,7 @@ impl CPU {
     fn write_to_arg(&mut self, arg: DstArg, val_arg: SrcArg) -> Result<(), &str> {
         match arg {
             DstArg::Reg16(reg) => {
-                self.regs.get_mut(&Self::translate_reg16(reg).unwrap()).unwrap().value = if let SrcArg::Word(value) = val_arg {
+                self.regs.get_mut(&Regs::translate_reg16(reg).unwrap()).unwrap().value = if let SrcArg::Word(value) = val_arg {
                     value
                     } else {
                         return Err("Mismatch operand sizes");
@@ -579,7 +633,7 @@ impl CPU {
                 Ok(())
             },
             DstArg::Reg8(reg_num) => {
-                let (reg_enum, part) = Self::translate_reg8(reg_num).unwrap();
+                let (reg_enum, part) = Regs::translate_reg8(reg_num).unwrap();
                 let reg = self.regs.get_mut(&reg_enum).unwrap();
                 let value = if let SrcArg::Byte(val) = val_arg {
                     val
@@ -918,22 +972,13 @@ impl CPU {
         self.ram[Self::physical_address(seg_val, loc) as usize]
     }
 
-    fn translate_reg16(num: u8) -> Option<Regs> {
-        match num {
-            0 => Some(Regs::AX),
-            1 => Some(Regs::CX),
-            2 => Some(Regs::DX),
-            3 => Some(Regs::BX),
-            4 => Some(Regs::SP),
-            5 => Some(Regs::BP),
-            6 => Some(Regs::SI),
-            7 => Some(Regs::DI),
-            _ => None
-        }
-    }
-
-    fn translate_reg8(num: u8) -> Option<(Regs, WordPart)> {
-        Some((Self::translate_reg16(num % 4)?, if num / 2 == 0 { WordPart::Low } else { WordPart::High }))
+    pub fn get_instruction_text(&self, loc: usize) -> Option<String> {
+        let (opcode, dst, src, _, _, _) = self.decode_instruction(loc);
+        Some(match opcode?.clone().num_args {
+            NumArgs::Zero => (opcode?.mnemonic)(),
+            NumArgs::One => format!("{} {}", (opcode?.mnemonic)(), dst?.to_text()),
+            NumArgs::Two => format!("{} {}, {}", (opcode?.mnemonic)(), dst?.to_text(), src?.to_text())
+        })
     }
 
     fn physical_address(seg: u16, offset: u16) -> u32 {

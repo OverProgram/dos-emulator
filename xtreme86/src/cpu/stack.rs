@@ -10,6 +10,10 @@ impl CPU {
         1
     }
 
+    pub fn push_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("PUSH"))
+    }
+
     pub fn pop(&mut self) -> usize {
         let val = SrcArg::Word(self.read_mem_word_seg(self.read_reg(Regs::SP).unwrap() + 1, Regs::SS).unwrap());
         self.write_to_arg(self.dst.clone().unwrap(), val).unwrap();
@@ -17,14 +21,26 @@ impl CPU {
         1
     }
 
+    pub fn pop_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("POP"))
+    }
+
     pub fn call(&mut self) -> usize {
         self.sub_command(0xFF, None, Some(DstArg::Reg(Regs::IP)), 0b110);
         self.jmp()
+    }
+
+    pub fn call_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("CALL"))
     }
 
     pub fn ret(&mut self) -> usize {
         self.sub_command(0x8F, None, Some(DstArg::Reg(Regs::IP)), 0b000);
         self.sub_command(0xE9, None, Some(DstArg::Reg(Regs::IP)), 0b000);
         0
+    }
+
+    pub fn ret_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("RET"))
     }
 }

@@ -7,6 +7,10 @@ impl CPU {
         0
     }
 
+    pub fn int_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("INT"))
+    }
+
     fn get_int_num(&mut self) -> u8 {
         match self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
             SrcArg::Byte(val) => Some(val),
@@ -38,5 +42,9 @@ impl CPU {
         self.sub_command(0x8F, None, Some(DstArg::Reg(Regs::CS)), 0b110);
         self.sub_command(0x8F, None, Some(DstArg::Reg(Regs::FLAGS)), 0b110);
         0
+    }
+
+    pub fn iret_mnemonic(_: u8) -> Option<String> {
+        Some(String::from("IRET"))
     }
 }
