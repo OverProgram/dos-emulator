@@ -285,6 +285,9 @@ impl CPU {
         opcodes.insert(0xF6, Opcode::new(Rc::new(alu::mul_dispatch), Rc::new(alu::mul_dispatch_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0x37, Opcode::new(Rc::new(alu::aaa), Rc::new(alu::aaa_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0xD5, Opcode::new(Rc::new(alu::aad), Rc::new(alu::aad_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
+        opcodes.insert(0x3F, Opcode::new(Rc::new(alu::aas), Rc::new(alu::aas_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0x14, Opcode::new(Rc::new(alu::adc), Rc::new(alu::adc_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg8(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
+        opcodes.insert(0x10, Opcode::new(Rc::new(alu::adc), Rc::new(alu::adc_mnemonic), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
         // Stack opcodes
         for x in 0..7 {
             opcodes.insert(0x50 + x, Opcode::new(Rc::new(stack::push), Rc::new(stack::push_mnemonic), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
@@ -838,10 +841,18 @@ impl CPU {
 
     fn set_flag_if(&mut self, flag: u16, cond: bool) {
         if cond {
-            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= flag;
+            self.set_flag(flag);
         } else {
-            self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !flag;
+            self.unset_flag(flag);
         }
+    }
+
+    fn set_flag(&mut self, flag: u16) {
+        self.regs.get_mut(&Regs::FLAGS).unwrap().value |= flag;
+    }
+
+    fn unset_flag(&mut self, flag: u16) {
+        self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !flag;
     }
 
     fn check_src_arg<T, U>(arg: &SrcArg, byte: T, word: U) -> bool where

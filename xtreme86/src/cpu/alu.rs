@@ -1,5 +1,7 @@
 use super::{CPU};
 use crate::cpu::{SrcArg, DstArg, Regs, CPUFlags, stack};
+use crate::cpu::Regs::FLAGS;
+use crate::cpu::SrcArg::Byte;
 
 pub fn add_with_carry_16_bit(arg1: u16, arg2: u16) -> u16 {
     let sum = ((arg1 as u32) + (arg2 as u32)) % 65536;
@@ -39,6 +41,7 @@ pub fn alu_dispatch_two_args(comp: &mut CPU) -> usize {
     match comp.reg_bits {
         0b000 => add(comp),
         0b001 => or(comp),
+        0b010 => adc(comp),
         0b100 => and(comp),
         0b101 => sub(comp),
         0b110 => xor(comp),
@@ -50,6 +53,7 @@ pub fn alu_dispatch_two_args_mnemonic(reg_bits: u8) -> Option<String> {
     Some(String::from(match reg_bits {
         0b000 => "ADD",
         0b001 => "OR",
+        0b010 => "ADC",
         0b100 => "AND",
         0b101 => "SUB",
         0b110 => "XOR",
@@ -110,6 +114,33 @@ pub fn add(comp: &mut CPU) -> usize {
 pub fn add_mnemonic(_: u8) -> Option<String> {
                                            Some(String::from("ADD"))
                                                                      }
+
+pub fn adc(comp: &mut CPU) -> usize {
+    let cf = (comp.read_reg(Regs::FLAGS).unwrap() & CPUFlags::CARRY) >> 0x01;
+    let src = comp.operation_2_args(|src, _| src + (cf as u8), |src, _| src + cf);
+    comp.check_carry_add(src.clone());
+    let sum = match src {
+        SrcArg::Word(val) => {
+            match comp.get_src_arg_mut(comp.dst.clone().unwrap()).unwrap() {
+                SrcArg::Word(dst) => Some(SrcArg::Word(val + dst)),
+                SrcArg::Byte(_) => None
+            }
+        }
+        SrcArg::Byte(val) => {
+            match comp.get_src_arg_mut(comp.dst.clone().unwrap()).unwrap() {
+                SrcArg::Word(_) => None,
+                SrcArg::Byte(dst) => Some(SrcArg::Byte(val + dst))
+            }
+        }
+    }.unwrap();
+    comp.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
+    comp.write_to_arg(comp.dst.clone().unwrap(), sum).unwrap();
+    0
+}
+
+pub fn adc_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("ADC"))
+}
 
 pub fn sub(comp: &mut CPU) -> usize {
     comp.check_carry_sub(comp.src.clone().unwrap());
@@ -317,4 +348,25 @@ pub fn aad(comp: &mut CPU) -> usize {
 
 pub fn aad_mnemonic(_: u8) -> Option<String> {
     Some(String::from("AAD"))
+}
+
+pub fn aas(comp: &mut CPU) -> usize {
+    let al = comp.get_reg_8(0).unwrap();
+
+    if (al & 0xF) > 9 || comp.check_flag(CPUFlags::AUX_CARRY) {
+        let ax = comp.regs.get_mut(&Regs::AX).unwrap();
+        let ah = ax.get_low();
+        ax.set_low(al - 6);
+        ax.set_high(ah - 1);
+        comp.set_flag(CPUFlags::AUX_CARRY);
+        comp.set_flag(CPUFlags::CARRY);
+    } else {
+        comp.unset_flag(CPUFlags::AUX_CARRY);
+        comp.unset_flag(CPUFlags::CARRY);
+    }
+    0
+}
+
+pub fn aas_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("AAS"))
 }
