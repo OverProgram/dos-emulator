@@ -15,11 +15,12 @@ use crate::cpu::reg::Reg;
 #[derive(BitFlags, Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
 enum OpcodeFlags {
-    Immediate = 0x01,
-    SizeMismatch = 0x02,
-    Nop = 0x04,
-    ForceWord = 0x08,
-    ForceByte = 0x10
+    Immediate = 0x0001,
+    DWordImmediate = 0x0002,
+    SizeMismatch = 0x0004,
+    Nop = 0x0008,
+    ForceWord = 0x0010,
+    ForceByte = 0x0020,
 }
 
 pub struct CPUFlags ;
@@ -61,6 +62,8 @@ enum DstArg {
     Reg16(u8),
     Imm8(u8),
     Imm16(u16),
+    Imm32(u32),
+    Ptr32(u16),
     Ptr16(u16),
     Ptr8(u16),
     Reg(Regs)
@@ -73,9 +76,11 @@ impl DstArg {
             DstArg::Reg16(id) => Regs::translate_reg16(*id).unwrap().to_text(),
             DstArg::Imm8(val) => val.to_string(),
             DstArg::Imm16(val) => val.to_string(),
+            DstArg::Imm32(val) => val.to_string(),
+            DstArg::Ptr32(val) => format!("[DWORD PTR {}]", val),
             DstArg::Ptr16(val) => format!("[WORD PTR {}]", val),
             DstArg::Ptr8(val) => format!("[BYTE PTR {}]", val),
-            DstArg::Reg(reg) => reg.to_text()
+            DstArg::Reg(reg) => reg.to_text(),
         }
     }
 }
@@ -83,7 +88,8 @@ impl DstArg {
 #[derive(Clone, Debug)]
 enum SrcArg {
     Byte(u8),
-    Word(u16)
+    Word(u16),
+    DWord(u32),
 }
 
 #[derive(Clone, Debug)]
@@ -294,7 +300,8 @@ impl CPU {
             opcodes.insert(0x58 + x, Opcode::new(Rc::new(stack::pop), Rc::new(stack::pop_mnemonic), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
         }
         opcodes.insert(0x8F, Opcode::new(Rc::new(stack::pop), Rc::new(stack::pop_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xE8, Opcode::new(Rc::new(stack::call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
+        opcodes.insert(0xE8, Opcode::new(Rc::new(stack::near_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
+        opcodes.insert(0x9A, Opcode::new(Rc::new(stack::far_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::DWordImmediate.into()));
         opcodes.insert(0xC3, Opcode::new(Rc::new(stack::ret), Rc::new(stack::ret_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
         // Jump opcodes
         opcodes.insert(0xE9, Opcode::new(Rc::new(jmp::jmp), Rc::new(jmp::jmp_mnemonic), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate.into()));
@@ -531,6 +538,8 @@ impl CPU {
             DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
             DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
             DstArg::Imm16(val) => Some(SrcArg::Word(val)),
+            DstArg::Imm32(val) => Some(SrcArg::DWord(val)),
+            DstArg::Ptr32(ptr) => { *next_cycles += 4; Some(SrcArg::DWord(self.read_mem_dword(ptr)?)) }
             DstArg::Ptr16(ptr) => { *next_cycles += 2; Some(SrcArg::Word(self.read_mem_word(ptr)?)) },
             DstArg::Ptr8(ptr) => { *next_cycles += 1; Some(SrcArg::Byte(self.read_mem_byte(ptr)?)) },
             DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
@@ -543,8 +552,10 @@ impl CPU {
             DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
             DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
             DstArg::Imm16(val) => Some(SrcArg::Word(val)),
-            DstArg::Ptr16(ptr) => Some(SrcArg::Word(self.read_mem_word(ptr)?)),
-            DstArg::Ptr8(ptr) => Some(SrcArg::Byte(self.read_mem_byte(ptr)?)),
+            DstArg::Imm32(val) => Some(SrcArg::DWord(val)),
+            DstArg::Ptr32(ptr) => Some(SrcArg::DWord(self.read_mem_dword(ptr)?)),
+            DstArg::Ptr16(ptr) => Some(SrcArg::Word(self.read_mem_word_mut(ptr)?)),
+            DstArg::Ptr8(ptr) => Some(SrcArg::Byte(self.read_mem_byte_mut(ptr)?)),
             DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
         }
     }
@@ -561,6 +572,10 @@ impl CPU {
         Some((self.read_mem_byte(ptr)? as u16) | ((self.read_mem_byte(ptr + 1)? as u16) << 8))
     }
 
+    fn read_mem_dword(&self, ptr: u16) -> Option<u32> {
+        Some((self.read_mem_word(ptr)? as u32) | ((self.read_mem_word(ptr + 2)? as u32) << 16))
+    }
+
     fn read_mem_byte_mut(&mut self, ptr: u16) -> Option<u8> {
         if ptr > self.ram.len() as u16 {
             None
@@ -572,6 +587,10 @@ impl CPU {
 
     fn read_mem_word_mut(&mut self, ptr: u16) -> Option<u16> {
         Some((self.read_mem_byte_mut(ptr)? as u16) | ((self.read_mem_byte_mut(ptr + 1)? as u16) << 8))
+    }
+
+    fn read_mem_dword_mut(&mut self, ptr: u16) -> Option<u32> {
+        Some((self.read_mem_word_mut(ptr)? as u32) | ((self.read_mem_word_mut(ptr + 2)? as u32) << 16))
     }
 
     fn write_mem_byte(&mut self, ptr: u16, val: u8) -> Result<(), &str> {
@@ -654,20 +673,22 @@ impl CPU {
             DstArg::Reg(reg) => {
                 self.regs.get_mut(&reg).unwrap().value = match val_arg {
                     SrcArg::Word(val) => val,
-                    SrcArg::Byte(_) => return Err("Mismatch operand sizes")
+                    _ => return Err("Mismatch operand sizes")
                 };
                 Ok(())
             },
             DstArg::Ptr16(ptr) => {
                 match val_arg {
                     SrcArg::Byte(val) => self.write_mem_word(ptr, val as u16),
-                    SrcArg::Word(val) => self.write_mem_word(ptr, val)
+                    SrcArg::Word(val) => self.write_mem_word(ptr, val),
+                    _ => return Err("Mismatch operand sizes")
                 }
             },
             DstArg::Ptr8(ptr) => {
                 match val_arg {
                     SrcArg::Byte(val) => self.write_mem_byte(ptr, val),
-                    SrcArg::Word(val) => self.write_mem_byte(ptr, val as u8)
+                    SrcArg::Word(val) => self.write_mem_byte(ptr, val as u8),
+                    _ => return Err("Mismatch operand sizes")
                 }
             },
             _ => Err("Invalid dst arg")
@@ -748,7 +769,8 @@ impl CPU {
             },
             SrcArg::Byte(dst) => {
                 Some(SrcArg::Byte(byte(dst)))
-            }
+            },
+            _ => None
         }.unwrap()
     }
 
@@ -772,7 +794,8 @@ impl CPU {
                 } else {
                     None
                 }
-            }
+            },
+            _ => None
         }.unwrap()
     }
 
@@ -804,6 +827,7 @@ impl CPU {
                     self.check_carry_16_bit(src as u16, dst);
                 }
             }
+            _ => ()
         };
     }
 
@@ -860,7 +884,8 @@ impl CPU {
         U: Fn(u16) -> bool {
         match arg {
             SrcArg::Byte(val) => byte(*val),
-            SrcArg::Word(val) => word(*val)
+            SrcArg::Word(val) => word(*val),
+            _ => panic!("Can't use DWord SrcArg in this opcode")
         }
     }
 
@@ -878,6 +903,7 @@ impl CPU {
                     self.check_carry_16_bit(dst, alu::twos_compliment_word(src as u16));
                 }
             }
+            _ => ()
         };
     }
 

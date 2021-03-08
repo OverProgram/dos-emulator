@@ -13,7 +13,7 @@ pub fn int_mnemonic(_: u8) -> Option<String> {
 fn get_int_num(comp: &mut CPU) -> u8 {
     match comp.get_src_arg_mut(comp.dst.clone().unwrap()).unwrap() {
         SrcArg::Byte(val) => Some(val),
-        SrcArg::Word(_) => None
+        _ => None
     }.unwrap()
 }
 

@@ -65,6 +65,8 @@ pub fn alu_dispatch_one_arg(comp: &mut CPU) -> usize {
     match comp.reg_bits {
         0b000 => inc(comp),
         0b001 => dec(comp),
+        0b010 => stack::near_call(comp),
+        0b011 => stack::far_call(comp),
         0b110 => stack::push(comp),
         _ => 0
     }
@@ -74,6 +76,7 @@ pub fn alu_dispatch_one_arg_mnemonic(reg_bits: u8) -> Option<String> {
     Some(String::from(match reg_bits {
         0b000 => "INC",
         0b001 => "DEC",
+        0b010 | 0b011 => "CALL",
         0b110 => "PUSH",
         _ => return None
     }))
@@ -123,15 +126,16 @@ pub fn adc(comp: &mut CPU) -> usize {
         SrcArg::Word(val) => {
             match comp.get_src_arg_mut(comp.dst.clone().unwrap()).unwrap() {
                 SrcArg::Word(dst) => Some(SrcArg::Word(val + dst)),
-                SrcArg::Byte(_) => None
+                _ => None
             }
         }
         SrcArg::Byte(val) => {
             match comp.get_src_arg_mut(comp.dst.clone().unwrap()).unwrap() {
-                SrcArg::Word(_) => None,
-                SrcArg::Byte(dst) => Some(SrcArg::Byte(val + dst))
+                SrcArg::Byte(dst) => Some(SrcArg::Byte(val + dst)),
+                _ => None,
             }
-        }
+        },
+        _ => None
     }.unwrap();
     comp.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
     comp.write_to_arg(comp.dst.clone().unwrap(), sum).unwrap();
@@ -204,8 +208,8 @@ pub fn inc(comp: &mut CPU) -> usize {
     // comp.check_carry_add(SrcArg::Byte(1));
     match comp.get_src_arg_mut(comp.dst.clone().unwrap()).unwrap() {
         SrcArg::Byte(dst) => comp.set_flag_if(CPUFlags::OVERFLOW, dst as u16 + 1 > 255),
-        SrcArg::Word(dst) => comp.set_flag_if(CPUFlags::OVERFLOW, dst as u32 + 1 > 65535)
-
+        SrcArg::Word(dst) => comp.set_flag_if(CPUFlags::OVERFLOW, dst as u32 + 1 > 65535),
+        _ => ()
     }
     let sum = comp.operation_1_arg(|dst| {
         add_with_carry_8_bit(dst, 1)
@@ -249,6 +253,9 @@ pub fn mul(comp: &mut CPU) -> usize {
         SrcArg::Word(val) => {
             (((val as u32) * (operand as u32)) as u16, (((val as u32) * (operand as u32)) >> 16) as u16, false)
         }
+        SrcArg::DWord(_) => {
+            panic!("Can't use DWord SrcArg in this opcode");
+        }
     };
     comp.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_low)).unwrap();
     if is_word {
@@ -266,6 +273,9 @@ pub fn imul(comp: &mut CPU) -> usize {
         }
         SrcArg::Word(val) => {
             (((val as i32) * (operand as i32)) as i16, (((val as i32) * (operand as i32)) >> 16) as i16, false)
+        }
+        SrcArg::DWord(_) => {
+            panic!("Can't use DWord SrcArg in this opcode");
         }
     };
     comp.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_low as u16)).unwrap();
@@ -292,6 +302,9 @@ pub fn div(comp: &mut CPU) -> usize {
             comp.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div)).unwrap();
             comp.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod)).unwrap();
         }
+        SrcArg::DWord(_) => {
+            panic!("Can't use DWord SrcArg in this opcode");
+        }
     };
     0
 }
@@ -311,6 +324,9 @@ pub fn idiv(comp: &mut CPU) -> usize {
             let result_mod = (operand % (val as i32)) as u16;
             comp.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div)).unwrap();
             comp.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod)).unwrap();
+        }
+        SrcArg::DWord(_) => {
+            panic!("Can't use DWord SrcArg in this opcode");
         }
     };
     0

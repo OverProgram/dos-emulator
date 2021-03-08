@@ -9,7 +9,7 @@ pub fn mov_mnemonic(_: u8) -> Option<String> {
                                            Some(String::from("MOV"))
                                                                      }
 
-pub fn nop(comp: &mut CPU) -> usize {
+pub fn nop(_: &mut CPU) -> usize {
                              0
                               }
 
