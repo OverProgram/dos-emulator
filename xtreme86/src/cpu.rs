@@ -283,6 +283,8 @@ impl CPU {
         opcodes.insert(0x83, Opcode::new(Rc::new(alu::alu_dispatch_two_args), Rc::new(alu::alu_dispatch_two_args_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
         opcodes.insert(0xFE, Opcode::new(Rc::new(alu::alu_dispatch_one_arg), Rc::new(alu::alu_dispatch_one_arg_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0xF6, Opcode::new(Rc::new(alu::mul_dispatch), Rc::new(alu::mul_dispatch_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0x37, Opcode::new(Rc::new(alu::aaa), Rc::new(alu::aaa_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xD5, Opcode::new(Rc::new(alu::aad), Rc::new(alu::aad_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
         // Stack opcodes
         for x in 0..7 {
             opcodes.insert(0x50 + x, Opcode::new(Rc::new(stack::push), Rc::new(stack::push_mnemonic), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));

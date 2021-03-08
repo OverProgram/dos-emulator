@@ -303,3 +303,18 @@ pub fn aaa_mnemonic(_: u8) -> Option<String> {
                                            Some(String::from("AAA"))
                                                                      }
 
+pub fn aad(comp: &mut CPU) -> usize {
+    if let Some(DstArg::Imm8(base)) = comp.dst {
+        let ax = comp.regs.get_mut(&Regs::AX).unwrap();
+        let al = ax.get_low();
+        let ah = ax.get_high();
+
+        ax.set_low((al + (ah * base)) & 0xFF);
+        ax.set_high(0x00);
+    }
+    0
+}
+
+pub fn aad_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("AAD"))
+}
