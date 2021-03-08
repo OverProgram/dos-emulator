@@ -16,11 +16,11 @@ use crate::cpu::reg::Reg;
 #[repr(u32)]
 enum OpcodeFlags {
     Immediate = 0x0001,
-    DWordImmediate = 0x0002,
-    SizeMismatch = 0x0004,
-    Nop = 0x0008,
-    ForceWord = 0x0010,
-    ForceByte = 0x0020,
+    SizeMismatch = 0x0002,
+    Nop = 0x0004,
+    ForceWord = 0x0008,
+    ForceByte = 0x0010,
+    ForceDWord = 0x0020,
 }
 
 pub struct CPUFlags ;
@@ -270,6 +270,8 @@ impl CPU {
             opcodes.insert(0xB8 + x, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
         }
         opcodes.insert(0xC6, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
+        // Conversion
+        opcodes.insert(0x98, Opcode::new(Rc::new(mem::cbw), Rc::new(mem::cbw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         // ALU opcodes
         let mut alu_opcodes: Vec<(Rc<dyn Fn(&mut CPU) -> usize>, Rc<dyn Fn(u8) -> Option<String>>, u8)> = Vec::new();
         alu_opcodes.push((Rc::new(alu::add), Rc::new(alu::add_mnemonic), 0x00));
@@ -301,7 +303,7 @@ impl CPU {
         }
         opcodes.insert(0x8F, Opcode::new(Rc::new(stack::pop), Rc::new(stack::pop_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0xE8, Opcode::new(Rc::new(stack::near_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
-        opcodes.insert(0x9A, Opcode::new(Rc::new(stack::far_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::DWordImmediate.into()));
+        opcodes.insert(0x9A, Opcode::new(Rc::new(stack::far_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
         opcodes.insert(0xC3, Opcode::new(Rc::new(stack::ret), Rc::new(stack::ret_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
         // Jump opcodes
         opcodes.insert(0xE9, Opcode::new(Rc::new(jmp::jmp), Rc::new(jmp::jmp_mnemonic), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate.into()));
@@ -372,6 +374,7 @@ impl CPU {
         next_cycles += opcode.cycles;
         let immediate = opcode.has_flag(OpcodeFlags::Immediate.into());
         let size_mismatch = opcode.has_flag(OpcodeFlags::SizeMismatch.into());
+        let force_dword = opcode.has_flag(OpcodeFlags::ForceDWord.into());
         let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
         let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
         let num_args = opcode.num_args;
@@ -416,7 +419,9 @@ impl CPU {
                     };
                     let arg1 = if immediate {
                         Some(
-                            if ((s == 1 && !size_mismatch) || force_word) && !force_byte {
+                            if force_dword {
+                                DstArg::Imm32(self.read_ip_dword(&mut ip_tmp, &mut next_cycles))
+                            } else if ((s == 1 && !size_mismatch) || force_word) && !force_byte {
                                 DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles))
                             } else {
                                 DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles))
@@ -448,7 +453,10 @@ impl CPU {
             NumArgs::One => {
                 if let None = dst {
                     if immediate {
-                        dst = Some(if ((d == 0 && !size_mismatch) || force_word) && !force_byte {
+                        dst = Some(
+                        if force_dword {
+                            DstArg::Imm32(self.read_ip_dword(&mut ip_tmp, &mut next_cycles))
+                        } else if ((d == 0 && !size_mismatch) || force_word) && !force_byte {
                             DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles))
                         } else {
                             DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles))
@@ -640,6 +648,10 @@ impl CPU {
 
     fn read_ip_word(&self, ip: &mut usize, next_cycles: &mut usize) -> u16 {
         (self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8)
+    }
+
+    fn read_ip_dword(&self, ip: &mut usize, next_cycles: &mut usize) -> u32 {
+        (self.read_ip_word(ip, next_cycles) as u32) | ((self.read_ip_word(ip, next_cycles) as u32) << 16)
     }
 
     fn read_ip_word_mut(&mut self) -> u16 {

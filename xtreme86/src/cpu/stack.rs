@@ -28,7 +28,12 @@ pub fn pop_mnemonic(_: u8) -> Option<String> {
 pub fn far_call(comp: &mut CPU) -> usize {
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::CS)), 0b110);
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::IP)), 0b110);
-    let comp_dst = comp.dst.clone().unwrap();
+    let tmp_dst = comp.dst.clone().unwrap();
+    let comp_dst = if let DstArg::Imm16(val) = tmp_dst {
+        DstArg::Ptr32(val)
+    } else {
+        tmp_dst
+    };
     let dst = comp.get_src_arg_mut(comp_dst);
     if let Some(SrcArg::DWord(destination)) = dst {
         let cs = (destination >> 16) as u16;
