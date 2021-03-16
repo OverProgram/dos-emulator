@@ -1,4 +1,4 @@
-use crate::cpu::{CPU, SrcArg, DstArg, Regs};
+use crate::cpu::{CPU, SrcArg, DstArg, Regs, exceptions};
 
 pub fn int_req(comp: &mut CPU) -> usize {
     let num = get_int_num(comp);
@@ -47,3 +47,24 @@ pub fn iret_mnemonic(_: u8) -> Option<String> {
                                             Some(String::from("IRET"))
                                                                        }
 
+pub fn bound(comp: &mut CPU) -> usize {
+    if let Some(SrcArg::DWord(bounds)) = comp.src.clone() {
+        match comp.dst.clone().unwrap() {
+            DstArg::Reg16(_) | DstArg::Reg(_) => (),
+            _ => comp.except(exceptions::INVALID_OPCODE).unwrap()
+        }
+        let lower_bound = (bounds & 0xFFFF) as u16;
+        let upper_bound = (bounds >> 16) as u16;
+        let arg = comp.get_src_arg_mut(comp.dst.clone().unwrap());
+        if let Some(SrcArg::Word(val)) = arg {
+            if val > upper_bound || val < lower_bound {
+                comp.except(exceptions::BOUND);
+            }
+        }
+    }
+    0
+}
+
+pub fn bound_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("BOUND"))
+}

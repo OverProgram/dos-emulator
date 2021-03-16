@@ -322,6 +322,7 @@ impl CPU {
         opcodes.insert(0xCD, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
         opcodes.insert(0xCC, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::Immediate.into()));
         opcodes.insert(0xCF, Opcode::new(Rc::new(int::iret), Rc::new(int::iret_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0x62, Opcode::new(Rc::new(int::bound), Rc::new(int::bound_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDWord.into()));
 
         Self {
             ram,
@@ -368,8 +369,6 @@ impl CPU {
         let mut next_cycles = 0;
         let mut ip_tmp = loc;
         let code = self.read_ip(&mut ip_tmp, &mut next_cycles);
-        let d = (code & 0x02) >> 1;
-        let mut s = (code & 0x01) >> 0;
         let opcode = self.get_opcode(&code).clone();
         next_cycles += opcode.cycles;
         let immediate = opcode.has_flag(OpcodeFlags::Immediate.into());
@@ -377,6 +376,8 @@ impl CPU {
         let force_dword = opcode.has_flag(OpcodeFlags::ForceDWord.into());
         let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
         let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
+        let d = (code & 0x02) >> 1;
+        let mut s = if force_dword { 2 } else { (code & 0x01) >> 0 };
         let num_args = opcode.num_args;
         let shorthand = opcode.shorthand.clone();
         let mut src: Option<DstArg> = None;
@@ -727,7 +728,14 @@ impl CPU {
             } else {
                 self.regs.get(&reg1).unwrap().value
             };
-            if s == 1 {
+            if s == 2 {
+                match mod_bits {
+                    0 => Some(DstArg::Ptr32(ptr_val)),
+                    1 => Some(DstArg::Ptr32(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
+                    2 => Some(DstArg::Ptr32(ptr_val + (self.read_ip_word(ip, next_cycles)))),
+                    _ => None
+                }
+            } else if s == 1 {
                 match mod_bits {
                     0 => Some(DstArg::Ptr16(ptr_val)),
                     1 => Some(DstArg::Ptr16(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
