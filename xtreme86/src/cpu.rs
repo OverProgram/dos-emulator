@@ -4,6 +4,7 @@ mod alu;
 mod stack;
 mod jmp;
 mod int;
+mod flags;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -11,6 +12,7 @@ use enumflags2::BitFlags;
 use std::fmt::{Debug, Formatter};
 use std::fmt;
 use crate::cpu::reg::Reg;
+use crate::cpu::flags::cmc_mnemonic;
 
 #[derive(BitFlags, Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
@@ -318,6 +320,11 @@ impl CPU {
             opcodes.insert(0x70 + i, Opcode::new(jmp::cond_jmp(condition), jmp::cond_jmp_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
             i += 1;
         }
+        // Flag opcodes
+        opcodes.insert(0xF8, Opcode::new(Rc::new(flags::clc), Rc::new(flags::clc_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xFC, Opcode::new(Rc::new(flags::cld), Rc::new(flags::cld_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xFA, Opcode::new(Rc::new(flags::cli), Rc::new(flags::cli_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xF5, Opcode::new(Rc::new(flags::cmc), Rc::new(flags::cmc_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         // Interrupt opcodes
         opcodes.insert(0xCD, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
         opcodes.insert(0xCC, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::Immediate.into()));
@@ -480,11 +487,11 @@ impl CPU {
     fn get_opcode(&self, code: &u8) -> &Opcode {
         match self.opcodes.get(&code) {
             Some(opcode) => opcode,
-            None => match self.opcodes.get(&(code & 0xFD)) {
+            None => match self.opcodes.get(&(code & 0xFE)) {
                 Some(opcode) => opcode,
-                None => match self.opcodes.get(&(code & 0xFC)) {
+                None => match self.opcodes.get(&(code & 0xFD)) {
                     Some(val) => val,
-                    None => self.opcodes.get(&(code & 0xFE)).unwrap()
+                    None => self.opcodes.get(&(code & 0xFC)).unwrap()
                 }
             }
         }
@@ -887,7 +894,7 @@ impl CPU {
         if cond {
             self.set_flag(flag);
         } else {
-            self.unset_flag(flag);
+            self.clear_flag(flag);
         }
     }
 
@@ -895,8 +902,12 @@ impl CPU {
         self.regs.get_mut(&Regs::FLAGS).unwrap().value |= flag;
     }
 
-    fn unset_flag(&mut self, flag: u16) {
+    fn clear_flag(&mut self, flag: u16) {
         self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !flag;
+    }
+
+    fn flip_flag(&mut self, flag: u16) {
+        self.regs.get_mut(&Regs::FLAGS).unwrap().value ^= flag;
     }
 
     fn check_src_arg<T, U>(arg: &SrcArg, byte: T, word: U) -> bool where

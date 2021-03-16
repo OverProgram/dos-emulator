@@ -377,8 +377,8 @@ pub fn aas(comp: &mut CPU) -> usize {
         comp.set_flag(CPUFlags::AUX_CARRY);
         comp.set_flag(CPUFlags::CARRY);
     } else {
-        comp.unset_flag(CPUFlags::AUX_CARRY);
-        comp.unset_flag(CPUFlags::CARRY);
+        comp.clear_flag(CPUFlags::AUX_CARRY);
+        comp.clear_flag(CPUFlags::CARRY);
     }
     0
 }
