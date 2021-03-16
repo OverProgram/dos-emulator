@@ -325,6 +325,8 @@ impl CPU {
         opcodes.insert(0xFC, Opcode::new(Rc::new(flags::cld), Rc::new(flags::cld_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0xFA, Opcode::new(Rc::new(flags::cli), Rc::new(flags::cli_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0xF5, Opcode::new(Rc::new(flags::cmc), Rc::new(flags::cmc_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0x38, Opcode::new(Rc::new(flags::cmp), Rc::new(flags::cmp_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::SizeMismatch.into()));
+        opcodes.insert(0x3C, Opcode::new(Rc::new(flags::cmp), Rc::new(flags::cmp_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
         // Interrupt opcodes
         opcodes.insert(0xCD, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
         opcodes.insert(0xCC, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::Immediate.into()));

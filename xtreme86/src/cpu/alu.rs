@@ -2,6 +2,7 @@ use super::{CPU};
 use crate::cpu::{SrcArg, DstArg, Regs, CPUFlags, stack};
 use crate::cpu::Regs::FLAGS;
 use crate::cpu::SrcArg::Byte;
+use crate::cpu::flags::cmp;
 
 pub fn add_with_carry_16_bit(arg1: u16, arg2: u16) -> u16 {
     let sum = ((arg1 as u32) + (arg2 as u32)) % 65536;
@@ -45,6 +46,7 @@ pub fn alu_dispatch_two_args(comp: &mut CPU) -> usize {
         0b100 => and(comp),
         0b101 => sub(comp),
         0b110 => xor(comp),
+        0b111 => cmp(comp),
         _ => 0
     }
 }

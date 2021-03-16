@@ -1,4 +1,5 @@
 use crate::cpu::{CPU, CPUFlags};
+use crate::cpu::alu::{sub_with_carry_8_bit, sub_with_carry_16_bit};
 
 pub fn clc(comp: &mut CPU) -> usize {
     comp.clear_flag(CPUFlags::CARRY);
@@ -34,4 +35,15 @@ pub fn cmc(comp: &mut CPU) -> usize {
 
 pub fn cmc_mnemonic(_: u8) -> Option<String> {
     Some(String::from("CMC"))
+}
+
+pub fn cmp(comp: &mut CPU) -> usize {
+    comp.check_carry_sub(comp.src.clone().unwrap());
+    let dif = comp.operation_2_args(|src, dst| sub_with_carry_8_bit(dst, src), |src, dst| sub_with_carry_16_bit(dst, src));
+    comp.check_flags_in_result(&dif, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
+    0
+}
+
+pub fn cmp_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("CMP"))
 }
