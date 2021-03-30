@@ -297,6 +297,7 @@ impl CPU {
         opcodes.insert(0x37, Opcode::new(Rc::new(alu::aaa), Rc::new(alu::aaa_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0xD5, Opcode::new(Rc::new(alu::aad), Rc::new(alu::aad_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
         opcodes.insert(0x3F, Opcode::new(Rc::new(alu::aas), Rc::new(alu::aas_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0x27, Opcode::new(Rc::new(alu::daa), Rc::new(alu::daa_mnemonic),NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0x14, Opcode::new(Rc::new(alu::adc), Rc::new(alu::adc_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg8(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
         opcodes.insert(0x10, Opcode::new(Rc::new(alu::adc), Rc::new(alu::adc_mnemonic), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
         // Stack opcodes

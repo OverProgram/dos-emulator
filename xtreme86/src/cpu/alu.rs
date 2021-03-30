@@ -388,3 +388,28 @@ pub fn aas(comp: &mut CPU) -> usize {
 pub fn aas_mnemonic(_: u8) -> Option<String> {
     Some(String::from("AAS"))
 }
+
+pub fn daa(comp: &mut CPU) -> usize {
+    let old_al = comp.regs.get(&Regs::AX).unwrap().get_low();
+    let old_cf = comp.check_flag(CPUFlags::CARRY);
+    comp.clear_flag(CPUFlags::CARRY);
+    if ((old_al & 0x0f) > 9) || comp.check_flag(CPUFlags::AUX_CARRY) {
+        comp.regs.get_mut(&Regs::AX).unwrap().set_low(old_al.wrapping_add(6));
+        if old_al.overflowing_add(6).1 || old_cf {
+            comp.set_flag(CPUFlags::AUX_CARRY);
+        } else {
+           comp.clear_flag(CPUFlags::AUX_CARRY);
+        }
+    }
+    if old_al > 0x99 || old_cf {
+        comp.regs.get_mut(&Regs::AX).unwrap().set_low(comp.regs.get(&Regs::AX).unwrap().get_low().wrapping_add(0x60));
+        comp.set_flag(CPUFlags::CARRY);
+    } else {
+        comp.clear_flag(CPUFlags::CARRY);
+    }
+    0
+}
+
+pub fn daa_mnemonic(_: u8)-> Option<String> {
+    Some(String::from("DAA"))
+}
