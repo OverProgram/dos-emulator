@@ -20,6 +20,16 @@ pub fn cbw_mnemonic(_: u8) -> Option<String> {
     Some(String::from("CBW"))
 }
 
+pub fn cdw(comp: &mut CPU) -> usize {
+    let ax = comp.regs.get(&Regs::AX).unwrap().value;
+    comp.regs.get_mut(&Regs::DX).unwrap().value = if ax & 0x80 == 1 { 0xFF } else { 0x00 };
+    0
+}
+
+pub fn cdw_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("CDW"))
+}
+
 pub fn nop(_: &mut CPU) -> usize {
                              0
                               }

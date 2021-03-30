@@ -274,6 +274,7 @@ impl CPU {
         opcodes.insert(0xC6, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
         // Conversion
         opcodes.insert(0x98, Opcode::new(Rc::new(mem::cbw), Rc::new(mem::cbw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        opcodes.insert(0x99, Opcode::new(Rc::new(mem::cdw), Rc::new(mem::cdw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         // ALU opcodes
         let mut alu_opcodes: Vec<(Rc<dyn Fn(&mut CPU) -> usize>, Rc<dyn Fn(u8) -> Option<String>>, u8)> = Vec::new();
         alu_opcodes.push((Rc::new(alu::add), Rc::new(alu::add_mnemonic), 0x00));
