@@ -232,3 +232,16 @@ mod int_test {
         assert_eq!(computer.read_reg(Regs::SP).unwrap(), 0xFFFF);
     }
 }
+
+#[cfg(test)]
+mod test_flags {
+    use crate::new_cpu_from_file;
+    use crate::cpu::Regs;
+
+    #[test]
+    fn test_cmp() {
+        let mut comp = new_cpu_from_file("tests/obj/cmp.out");
+        comp.run_to_nop(0);
+        assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x30);
+    }
+}

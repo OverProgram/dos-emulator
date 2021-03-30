@@ -37,7 +37,6 @@ pub fn cmc_mnemonic(_: u8) -> Option<String> {
     Some(String::from("CMC"))
 }
 
-// TODO: TEST EVERYTHING UNDER THIS!!!!!
 pub fn cmp(comp: &mut CPU) -> usize {
     comp.check_carry_sub(comp.src.clone().unwrap());
     let dif = comp.operation_2_args(|src, dst| sub_with_carry_8_bit(dst, src), |src, dst| sub_with_carry_16_bit(dst, src));

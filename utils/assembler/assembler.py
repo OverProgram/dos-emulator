@@ -14,7 +14,7 @@ should_continue = True
 
 
 def generate_code():
-    code = ".code16\n.intel_syntax noprefix\n.text\n"
+    code = "CPU 286\n"
     for line in lines:
         code += "{}\n".format(line)
     return code
@@ -26,7 +26,7 @@ def compile_code(code):
     bin_file = tempfile.NamedTemporaryFile(mode='rb')
     asm_file.write(code)
     asm_file.flush()
-    stdout, stderr = call_cmd("as {} -o {}".format(asm_file.name, obj_file.name))
+    stdout, stderr = call_cmd("nasm {} -o {}".format(asm_file.name, obj_file.name))
     if stderr:
         print("error: {}".format(stderr.decode('utf-8')), file=sys.stderr)
         asm_file.close()
