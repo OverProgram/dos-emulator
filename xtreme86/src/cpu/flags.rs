@@ -80,3 +80,13 @@ pub fn cmps(comp: &mut CPU) -> usize {
 pub fn cmps_mnemonic(_: u8) -> Option<String> {
     Some(String::from("CMPS"))
 }
+
+pub fn lahf(comp: &mut CPU) -> usize {
+    let new_ah = comp.regs.get(&Regs::FLAGS).unwrap().get_low();
+    comp.regs.get_mut(&Regs::AX).unwrap().set_low(new_ah);
+    0
+}
+
+pub fn lahf_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("LAHF"))
+}
