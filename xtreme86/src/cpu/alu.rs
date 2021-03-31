@@ -1,7 +1,5 @@
 use super::{CPU};
-use crate::cpu::{SrcArg, DstArg, Regs, CPUFlags, stack, exceptions};
-use crate::cpu::Regs::FLAGS;
-use crate::cpu::SrcArg::Byte;
+use crate::cpu::{SrcArg, DstArg, Regs, CPUFlags, stack, exceptions, jmp};
 use crate::cpu::flags::cmp;
 
 pub fn add_with_carry_16_bit(arg1: u16, arg2: u16) -> u16 {
@@ -69,6 +67,8 @@ pub fn alu_dispatch_one_arg(comp: &mut CPU) -> usize {
         0b001 => dec(comp),
         0b010 => stack::near_call(comp),
         0b011 => stack::far_call(comp),
+        0b100 => jmp::jmp(comp),
+        0b101 => jmp::jmp_far(comp),
         0b110 => stack::push(comp),
         _ => 0
     }
@@ -79,6 +79,7 @@ pub fn alu_dispatch_one_arg_mnemonic(reg_bits: u8) -> Option<String> {
         0b000 => "INC",
         0b001 => "DEC",
         0b010 | 0b011 => "CALL",
+        0b100 | 0b101 => "JMP",
         0b110 => "PUSH",
         _ => return None
     }))
