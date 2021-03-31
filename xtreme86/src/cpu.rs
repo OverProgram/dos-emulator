@@ -315,6 +315,7 @@ impl CPU {
         opcodes.insert(0x9A, Opcode::new(Rc::new(stack::far_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
         opcodes.insert(0xC3, Opcode::new(Rc::new(stack::ret), Rc::new(stack::ret_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
         opcodes.insert(0xC8, Opcode::new(Rc::new(stack::enter), Rc::new(stack::enter_mnemonic), NumArgs::Two, 1, Some((Placeholder::Imm, Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
+        opcodes.insert(0xC9, Opcode::new(Rc::new(stack::leave), Rc::new(stack::leave_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         // Jump opcodes
         opcodes.insert(0xE9, Opcode::new(Rc::new(jmp::jmp), Rc::new(jmp::jmp_mnemonic), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate.into()));
         let flag_condition: Vec<(Box<dyn Fn(&Self) -> bool>, String)> = vec![(Box::new(|this: &Self| this.check_flag(CPUFlags::OVERFLOW)), String::from("O")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}), String::from("NO")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY)}), String::from("C")),

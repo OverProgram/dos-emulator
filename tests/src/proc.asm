@@ -3,5 +3,7 @@
     nop
 
 proc:
+    enter 5, 0
     mov ax, 0x16
+    leave
     ret
