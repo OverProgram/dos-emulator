@@ -74,3 +74,32 @@ pub fn ret(comp: &mut CPU) -> usize {
 pub fn ret_mnemonic(_: u8) -> Option<String> {
                                            Some(String::from("RET"))
                                                                      }
+
+pub fn enter(comp: &mut CPU) -> usize {
+    let dst_arg = comp.dst.unwrap();
+    let dst = match comp.get_src_arg_mut(dst_arg) {
+        Some(SrcArg::Word(val)) => val,
+        _ => panic!("First operand for ENTER must be a word")
+    };
+    let level = match comp.src {
+        Some(SrcArg::Byte(val)) => val % 13,
+        _ => panic!("Second operand for ENTER must be a byte")
+    };
+    let frame_ptr = comp.regs.get(&Regs::SP).unwrap().value;
+    if level > 0 {
+        for _ in 1..level {
+            let new_bp = comp.regs.get(&Regs::BP).unwrap().value - 2;
+            comp.regs.get_mut(&Regs::BP).unwrap().value = new_bp;
+            comp.sub_command(0xFE, None, Some(DstArg::Ptr16(new_bp)), 0b110);
+        }
+        comp.sub_command(0xFE, None, Some(DstArg::Imm16(frame_ptr)), 0b110);
+    }
+    comp.regs.get_mut(&Regs::BP).unwrap().value = frame_ptr;
+    let new_sp = comp.regs.get(&Regs::SP).unwrap().value - dst;
+    comp.regs.get_mut(&Regs::SP).unwrap().value = new_sp;
+    0
+}
+
+pub fn enter_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("ENTER"))
+}

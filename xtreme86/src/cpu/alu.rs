@@ -1,5 +1,5 @@
 use super::{CPU};
-use crate::cpu::{SrcArg, DstArg, Regs, CPUFlags, stack};
+use crate::cpu::{SrcArg, DstArg, Regs, CPUFlags, stack, exceptions};
 use crate::cpu::Regs::FLAGS;
 use crate::cpu::SrcArg::Byte;
 use crate::cpu::flags::cmp;
@@ -291,18 +291,26 @@ pub fn imul(comp: &mut CPU) -> usize {
 pub fn div(comp: &mut CPU) -> usize {
     match comp.get_src_arg_mut(comp.dst.clone().unwrap()).unwrap() {
         SrcArg::Byte(val) => {
-            let operand = comp.get_reg_16(0).unwrap();
-            let result_div = (operand / (val as u16)) as u8;
-            let result_mod = (operand % (val as u16)) as u8;
-            let result = SrcArg::Word((result_div as u16) | ((result_mod as u16) << 8));
-            comp.write_to_arg(DstArg::Reg16(0), result).unwrap();
+            if val == 0 {
+                comp.except(exceptions::DIVIDE_BY_ZERO).unwrap();
+            } else {
+                let operand = comp.get_reg_16(0).unwrap();
+                let result_div = (operand / (val as u16)) as u8;
+                let result_mod = (operand % (val as u16)) as u8;
+                let result = SrcArg::Word((result_div as u16) | ((result_mod as u16) << 8));
+                comp.write_to_arg(DstArg::Reg16(0), result).unwrap();
+            }
         },
         SrcArg::Word(val) => {
-            let operand = (comp.get_reg_16(0).unwrap() as u32) | ((comp.get_reg_16(2).unwrap() as u32) << 16);
-            let result_div = (operand / (val as u32)) as u16;
-            let result_mod = (operand % (val as u32)) as u16;
-            comp.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div)).unwrap();
-            comp.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod)).unwrap();
+            if val == 0 {
+                comp.except(exceptions::DIVIDE_BY_ZERO).unwrap();
+            } else {
+                let operand = (comp.get_reg_16(0).unwrap() as u32) | ((comp.get_reg_16(2).unwrap() as u32) << 16);
+                let result_div = (operand / (val as u32)) as u16;
+                let result_mod = (operand % (val as u32)) as u16;
+                comp.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div)).unwrap();
+                comp.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod)).unwrap();
+            }
         }
         SrcArg::DWord(_) => {
             panic!("Can't use DWord SrcArg in this opcode");
@@ -314,18 +322,26 @@ pub fn div(comp: &mut CPU) -> usize {
 pub fn idiv(comp: &mut CPU) -> usize {
     match comp.get_src_arg_mut(comp.dst.clone().unwrap()).unwrap() {
         SrcArg::Byte(val) => {
-            let operand = comp.get_reg_16(0).unwrap() as i16;
-            let result_div = (operand / (val as i16)) as i8;
-            let result_mod = (operand % (val as i16)) as i8;
-            let result = SrcArg::Word(((result_div as i16) | ((result_mod as i16) << 8)) as u16);
-            comp.write_to_arg(DstArg::Reg16(0), result).unwrap();
+            if val == 0 {
+                comp.except(exceptions::DIVIDE_BY_ZERO).unwrap();
+            } else {
+                let operand = comp.get_reg_16(0).unwrap() as i16;
+                let result_div = (operand / (val as i16)) as i8;
+                let result_mod = (operand % (val as i16)) as i8;
+                let result = SrcArg::Word(((result_div as i16) | ((result_mod as i16) << 8)) as u16);
+                comp.write_to_arg(DstArg::Reg16(0), result).unwrap();
+            }
         },
         SrcArg::Word(val) => {
-            let operand = (comp.get_reg_16(0).unwrap() as i32) | ((comp.get_reg_16(2).unwrap() as i32) << 16);
-            let result_div = (operand / (val as i32)) as u16;
-            let result_mod = (operand % (val as i32)) as u16;
-            comp.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div)).unwrap();
-            comp.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod)).unwrap();
+            if val == 0 {
+                comp.except(exceptions::DIVIDE_BY_ZERO).unwrap();
+            } else {
+                let operand = (comp.get_reg_16(0).unwrap() as i32) | ((comp.get_reg_16(2).unwrap() as i32) << 16);
+                let result_div = (operand / (val as i32)) as u16;
+                let result_mod = (operand % (val as i32)) as u16;
+                comp.write_to_arg(DstArg::Reg16(0), SrcArg::Word(result_div)).unwrap();
+                comp.write_to_arg(DstArg::Reg16(2), SrcArg::Word(result_mod)).unwrap();
+            }
         }
         SrcArg::DWord(_) => {
             panic!("Can't use DWord SrcArg in this opcode");
