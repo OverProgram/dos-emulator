@@ -330,6 +330,12 @@ impl CPU {
             opcodes.insert(0x70 + i, Opcode::new(jmp::cond_jmp(condition), jmp::cond_jmp_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
             i += 1;
         }
+        let loop_conditions: Vec<(Box<dyn Fn(&Self) -> bool>, String)> = vec![(Box::new(|this: &Self| !this.check_flag(CPUFlags::ZERO)), String::from("NE")), (Box::new(|this: &Self| this.check_flag(CPUFlags::ZERO)), String::from("E")), (Box::new(|this: &Self| true), String::from(""))];
+        i = 0;
+        for (condition, cond_text) in loop_conditions {
+            opcodes.insert(0xE0 + i, Opcode::new(jmp::lop(condition), jmp::loop_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
+            i += 1;
+        }
         // Flag opcodes
         opcodes.insert(0xF8, Opcode::new(Rc::new(flags::clc), Rc::new(flags::clc_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0xFC, Opcode::new(Rc::new(flags::cld), Rc::new(flags::cld_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
