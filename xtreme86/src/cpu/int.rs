@@ -58,7 +58,7 @@ pub fn bound(comp: &mut CPU) -> usize {
         let arg = comp.get_src_arg_mut(comp.dst.clone().unwrap());
         if let Some(SrcArg::Word(val)) = arg {
             if val > upper_bound || val < lower_bound {
-                comp.except(exceptions::BOUND);
+                comp.except(exceptions::BOUND).unwrap();
             }
         }
     }

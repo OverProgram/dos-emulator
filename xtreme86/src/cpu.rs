@@ -23,6 +23,7 @@ enum OpcodeFlags {
     ForceWord = 0x0008,
     ForceByte = 0x0010,
     ForceDWord = 0x0020,
+    DoubleImmediate = 0x0040,
 }
 
 pub struct CPUFlags ;
@@ -94,7 +95,7 @@ enum SrcArg {
     DWord(u32),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 enum Placeholder {
     Reg8(u8),
     Reg16(u8),
@@ -388,6 +389,7 @@ impl CPU {
         let force_dword = opcode.has_flag(OpcodeFlags::ForceDWord.into());
         let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
         let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
+        let double_immediate = opcode.has_flag(OpcodeFlags::DoubleImmediate.into());
         let d = (code & 0x02) >> 1;
         let mut s = if force_dword { 2 } else { (code & 0x01) >> 0 };
         let num_args = opcode.num_args;
@@ -397,25 +399,41 @@ impl CPU {
         let mut reg_bits = 0;
 
         if let Some((arg1, arg2)) = opcode.shorthand.clone() {
-            let arg1_translated = Some(self.translate_placeholder(arg1, s, &mut ip_tmp, &mut next_cycles));
-            s = match arg1_translated.clone().unwrap() {
-                DstArg::Reg8(_) => 0,
-                DstArg::Reg16(_) => 1,
-                _ => s
-            };
-            let mut arg2_translated = None;
-            if let Some(arg) = arg2 {
-                arg2_translated = Some(self.translate_placeholder(arg, s, &mut ip_tmp, &mut next_cycles));
-            }
-            let one_arg = if let NumArgs::Two = num_args { false } else { true };
-            if d == 1 && !immediate && !one_arg {
-                src = arg1_translated;
-                dst = arg2_translated;
+            if let (Placeholder::Imm, Some(Placeholder::Imm)) = (arg1, arg2) {
+                if size_mismatch {
+                    dst = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
+                    src = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
+                } else {
+                    if s == 0 {
+                        dst = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
+                        src = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
+                    } else if s ==2 {
+                        dst = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
+                        src = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
+                    }
+                }
             } else {
-                src = arg2_translated;
-                dst = arg1_translated;
+                let arg1_translated = Some(self.translate_placeholder(arg1, s, &mut ip_tmp, &mut next_cycles));
+                s = match arg1_translated.clone().unwrap() {
+                    DstArg::Reg8(_) => 0,
+                    DstArg::Reg16(_) => 1,
+                    _ => s
+                };
+                let mut arg2_translated = None;
+                if let Some(arg) = arg2 {
+                    arg2_translated = Some(self.translate_placeholder(arg, s, &mut ip_tmp, &mut next_cycles));
+                }
+                let one_arg = if let NumArgs::Two = num_args { false } else { true };
+                if d == 1 && !immediate && !one_arg {
+                    src = arg1_translated;
+                    dst = arg2_translated;
+                } else {
+                    src = arg2_translated;
+                    dst = arg1_translated;
+                }
             }
         }
+
         match num_args {
             NumArgs::Two => {
                 if let None = shorthand {

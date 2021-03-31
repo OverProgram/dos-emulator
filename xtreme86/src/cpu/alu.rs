@@ -402,7 +402,8 @@ pub fn daa(comp: &mut CPU) -> usize {
         }
     }
     if old_al > 0x99 || old_cf {
-        comp.regs.get_mut(&Regs::AX).unwrap().set_low(comp.regs.get(&Regs::AX).unwrap().get_low().wrapping_add(0x60));
+        let new_ax = comp.regs.get(&Regs::AX).unwrap().get_low().wrapping_add(0x60);
+        comp.regs.get_mut(&Regs::AX).unwrap().set_low(new_ax);
         comp.set_flag(CPUFlags::CARRY);
     } else {
         comp.clear_flag(CPUFlags::CARRY);
