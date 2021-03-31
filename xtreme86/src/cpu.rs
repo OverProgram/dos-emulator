@@ -273,6 +273,8 @@ impl CPU {
             opcodes.insert(0xB8 + x, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
         }
         opcodes.insert(0xC6, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
+        opcodes.insert(0xC5, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::lds_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDWord.into()));
+        opcodes.insert(0xC4, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::les_mnemonic), NumArgs::Two, 1, None, Regs::ES, OpcodeFlags::ForceDWord.into()));
         // Conversion
         opcodes.insert(0x98, Opcode::new(Rc::new(mem::cbw), Rc::new(mem::cbw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0x99, Opcode::new(Rc::new(mem::cdw), Rc::new(mem::cdw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
@@ -367,7 +369,7 @@ impl CPU {
         } else {
             let opcode_address =  (self.regs[&Regs::CS].value, self.regs[&Regs::IP].value);
             self.opcode_address = opcode_address;
-            let (instruction, dst, src, next_cycles, ip_offset, reg_bits) = self.decode_instruction(self.regs.get(&Regs::IP).unwrap().value as usize);
+            let (instruction, dst, src, seg, next_cycles, ip_offset, reg_bits) = self.decode_instruction(self.regs.get(&Regs::IP).unwrap().value as usize);
             self.instruction = instruction;
             self.dst = dst;
             self.src = match src {
@@ -376,11 +378,12 @@ impl CPU {
             };
             self.reg_bits = reg_bits;
             self.next_cycles = next_cycles;
+            self.seg = seg;
             self.regs.get_mut(&Regs::IP).unwrap().value = ip_offset as u16;
         }
     }
 
-    fn decode_instruction(&self, loc: usize) -> (Option<Opcode>, Option<DstArg>, Option<DstArg>, usize, u16, u8) {
+    fn decode_instruction(&self, loc: usize) -> (Option<Opcode>, Option<DstArg>, Option<DstArg>, Regs, usize, u16, u8) {
         let mut next_cycles = 0;
         let mut ip_tmp = loc;
         let code = self.read_ip(&mut ip_tmp, &mut next_cycles);
@@ -391,11 +394,11 @@ impl CPU {
         let force_dword = opcode.has_flag(OpcodeFlags::ForceDWord.into());
         let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
         let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
-        let double_immediate = opcode.has_flag(OpcodeFlags::DoubleImmediate.into());
         let d = (code & 0x02) >> 1;
         let mut s = if force_dword { 2 } else { (code & 0x01) >> 0 };
         let num_args = opcode.num_args;
         let shorthand = opcode.shorthand.clone();
+        let seg = opcode.segment;
         let mut src: Option<DstArg> = None;
         let mut dst: Option<DstArg> = None;
         let mut reg_bits = 0;
@@ -460,11 +463,13 @@ impl CPU {
                                 DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles))
                             }
                         )
+                    } else if force_dword {
+                        Some(DstArg::Ptr32(self.read_ip_word(&mut ip_tmp, &mut next_cycles)))
                     } else {
                         Some(Self::reg_to_arg(reg, s))
                     };
 
-                    if d == 0 || immediate {
+                    if d == 0 || immediate || force_dword {
                         if let None = self.src {
                             src = arg1;
                         }
@@ -506,7 +511,7 @@ impl CPU {
             },
             NumArgs::Zero => ()
         }
-        (Some(opcode), dst, src, next_cycles, ip_tmp as u16, reg_bits)
+        (Some(opcode), dst, src, seg, next_cycles, ip_tmp as u16, reg_bits)
     }
 
     fn get_opcode(&self, code: &u8) -> &Opcode {
@@ -1034,7 +1039,7 @@ impl CPU {
     }
 
     pub fn get_instruction_text(&self, loc: usize) -> Option<String> {
-        let (opcode, dst, src, _, _, reg_bits) = self.decode_instruction(loc);
+        let (opcode, dst, src, _, _, _, reg_bits) = self.decode_instruction(loc);
         let mnemonic = opcode.clone()?.mnemonic;
         Some(match opcode?.clone().num_args {
             NumArgs::Zero => (mnemonic)(reg_bits)?,
