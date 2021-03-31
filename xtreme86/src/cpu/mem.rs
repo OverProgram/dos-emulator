@@ -1,5 +1,5 @@
 use super::{CPU};
-use crate::cpu::{Regs, SrcArg, DstArg};
+use crate::cpu::{Regs, SrcArg, DstArg, CPUFlags};
 
 pub fn mov(comp: &mut CPU) -> usize {
     comp.write_to_arg(comp.dst.clone().unwrap(), comp.src.clone().unwrap()).unwrap();
@@ -62,6 +62,32 @@ pub fn lea(comp: &mut CPU) -> usize {
 
 pub fn lea_mnemonic(_: u8) -> Option<String> {
     Some(String::from("LEA"))
+}
+
+pub fn lods(comp: &mut CPU) -> usize {
+    let src_loc = comp.regs.get(&Regs::SI).unwrap().value;
+    let comp_dst = comp.dst.unwrap();
+    match comp.get_src_arg_mut(comp_dst) {
+        Some(SrcArg::Word(_)) => {
+            let src = comp.get_src_arg_mut(DstArg::Ptr16(src_loc));
+            comp.write_to_arg(DstArg::Reg8(0), src.unwrap());
+        }
+        Some(SrcArg::Byte(_)) => {
+            let src = comp.get_src_arg_mut(DstArg::Ptr8(src_loc));
+            comp.write_to_arg(DstArg::Reg(Regs::AX), src.unwrap());
+        }
+        _ => panic!("LODS can only get a byte or word")
+    }
+    if comp.check_flag(CPUFlags::DIRECTION) {
+        comp.regs.get_mut(&Regs::SI).unwrap().value += 1;
+    } else  {
+        comp.regs.get_mut(&Regs::SI).unwrap().value -= 1;
+    }
+    0
+}
+
+pub fn lods_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("LODS"))
 }
 
 pub fn nop(_: &mut CPU) -> usize {

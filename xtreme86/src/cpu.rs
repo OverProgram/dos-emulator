@@ -12,7 +12,6 @@ use enumflags2::BitFlags;
 use std::fmt::{Debug, Formatter};
 use std::fmt;
 use crate::cpu::reg::Reg;
-use crate::cpu::flags::cmc_mnemonic;
 
 #[derive(BitFlags, Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
@@ -277,6 +276,8 @@ impl CPU {
         opcodes.insert(0xC5, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::lds_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDWord.into()));
         opcodes.insert(0xC4, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::les_mnemonic), NumArgs::Two, 1, None, Regs::ES, OpcodeFlags::ForceDWord.into()));
         opcodes.insert(0x8D, Opcode::new(Rc::new(mem::lea), Rc::new(mem::lea_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDirection.into()));
+        opcodes.insert(0xAC, Opcode::new(Rc::new(mem::lods), Rc::new(mem::lods_mnemonic), NumArgs::One, 1, Some((Placeholder::Byte(0), None)), Regs::DS, BitFlags::empty()));
+        opcodes.insert(0xAD, Opcode::new(Rc::new(mem::lods), Rc::new(mem::lods_mnemonic), NumArgs::One, 1, Some((Placeholder::Word(0), None)), Regs::DS, BitFlags::empty()));
         // Conversion
         opcodes.insert(0x98, Opcode::new(Rc::new(mem::cbw), Rc::new(mem::cbw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0x99, Opcode::new(Rc::new(mem::cdw), Rc::new(mem::cdw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
