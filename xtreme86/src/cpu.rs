@@ -23,7 +23,7 @@ enum OpcodeFlags {
     ForceWord = 0x0008,
     ForceByte = 0x0010,
     ForceDWord = 0x0020,
-    DoubleImmediate = 0x0040,
+    ForceDirection = 0x0040,
 }
 
 pub struct CPUFlags ;
@@ -237,6 +237,7 @@ pub struct CPU {
     reg_bits: u8,
     irq: Option<u8>,
     opcode_address: (u16, u16),
+    src_ptr: Option<u16>,
 }
 
 impl CPU {
@@ -275,6 +276,7 @@ impl CPU {
         opcodes.insert(0xC6, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
         opcodes.insert(0xC5, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::lds_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDWord.into()));
         opcodes.insert(0xC4, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::les_mnemonic), NumArgs::Two, 1, None, Regs::ES, OpcodeFlags::ForceDWord.into()));
+        opcodes.insert(0x8D, Opcode::new(Rc::new(mem::lea), Rc::new(mem::lea_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDirection.into()));
         // Conversion
         opcodes.insert(0x98, Opcode::new(Rc::new(mem::cbw), Rc::new(mem::cbw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0x99, Opcode::new(Rc::new(mem::cdw), Rc::new(mem::cdw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
@@ -353,6 +355,7 @@ impl CPU {
             reg_bits: 0,
             irq: None,
             opcode_address: (0, 0),
+            src_ptr: None
         }
     }
 
@@ -364,6 +367,7 @@ impl CPU {
             self.instruction = None;
             self.src = None;
             self.dst = None;
+            self.src_ptr = None
         } else if let Some(_) = self.irq {
             self.next_cycles += int::int(self);
         } else {
@@ -372,6 +376,10 @@ impl CPU {
             let (instruction, dst, src, seg, next_cycles, ip_offset, reg_bits) = self.decode_instruction(self.regs.get(&Regs::IP).unwrap().value as usize);
             self.instruction = instruction;
             self.dst = dst;
+            self.src_ptr = match src {
+                Some(arg) => Self::get_ptr(arg),
+                None => None
+            };
             self.src = match src {
                 Some(arg) => self.get_src_arg_mut(arg),
                 None => None
@@ -394,6 +402,7 @@ impl CPU {
         let force_dword = opcode.has_flag(OpcodeFlags::ForceDWord.into());
         let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
         let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
+        let force_direction = opcode.has_flag(OpcodeFlags::ForceDirection.into());
         let d = (code & 0x02) >> 1;
         let mut s = if force_dword { 2 } else { (code & 0x01) >> 0 };
         let num_args = opcode.num_args;
@@ -429,7 +438,7 @@ impl CPU {
                     arg2_translated = Some(self.translate_placeholder(arg, s, &mut ip_tmp, &mut next_cycles));
                 }
                 let one_arg = if let NumArgs::Two = num_args { false } else { true };
-                if d == 1 && !immediate && !one_arg {
+                if (d == 1 && !immediate && !one_arg) || force_direction {
                     src = arg1_translated;
                     dst = arg2_translated;
                 } else {
@@ -469,7 +478,7 @@ impl CPU {
                         Some(Self::reg_to_arg(reg, s))
                     };
 
-                    if d == 0 || immediate || force_dword {
+                    if (d == 0 || immediate || force_dword) && !force_direction {
                         if let None = self.src {
                             src = arg1;
                         }
@@ -603,6 +612,13 @@ impl CPU {
             DstArg::Ptr16(ptr) => Some(SrcArg::Word(self.read_mem_word_mut(ptr)?)),
             DstArg::Ptr8(ptr) => Some(SrcArg::Byte(self.read_mem_byte_mut(ptr)?)),
             DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
+        }
+    }
+
+    fn get_ptr(arg: DstArg) -> Option<u16> {
+        match arg {
+            DstArg::Ptr32(val) | DstArg::Ptr16(val) | DstArg::Ptr8(val) => Some(val),
+            _ => None
         }
     }
     

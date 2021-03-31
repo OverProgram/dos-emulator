@@ -37,6 +37,8 @@ fn new_cpu_vec(code: Vec<u8>) -> cpu::CPU {
 #[cfg(test)]
 mod mov_test {
     use super::cpu;
+    use crate::new_cpu_from_file;
+    use crate::cpu::Regs;
 
     #[test]
     fn test_mov_reg_shorthand() {
@@ -63,6 +65,13 @@ mod mov_test {
         computer.load(code, 0);
         computer.execute_next_from(1);
         assert_eq!(computer.read_mem(0), 0x55);
+    }
+
+    #[test]
+    fn test_lea() {
+        let mut comp = new_cpu_from_file("tests/obj/lea.out");
+        comp.run_to_nop(0);
+        assert_eq!(comp.read_reg(Regs::AX).unwrap(), 9);
     }
 }
 

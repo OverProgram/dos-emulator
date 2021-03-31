@@ -53,6 +53,17 @@ pub fn les_mnemonic(_: u8) -> Option<String> {
     Some(String::from("LES"))
 }
 
+pub fn lea(comp: &mut CPU) -> usize {
+    let new_dst = SrcArg::Word(comp.src_ptr.unwrap());
+    let old_dst = comp.dst.unwrap();
+    comp.write_to_arg(old_dst, new_dst);
+    0
+}
+
+pub fn lea_mnemonic(_: u8) -> Option<String> {
+    Some(String::from("LEA"))
+}
+
 pub fn nop(_: &mut CPU) -> usize {
                              0
                               }
