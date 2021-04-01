@@ -1,7 +1,6 @@
 use super::{CPU};
 use crate::cpu::{DstArg, Regs, SrcArg};
 use std::rc::Rc;
-use std::net::Shutdown::Read;
 
 
 pub fn jmp(comp: &mut CPU) -> usize {

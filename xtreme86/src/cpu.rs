@@ -380,6 +380,7 @@ impl CPU {
             self.next_cycles += int::int(self);
         } else {
             let opcode_address =  (self.regs[&Regs::CS].value, self.regs[&Regs::IP].value);
+            println!("now executing {}", self.get_instruction_text(opcode_address.1 as usize).unwrap());
             self.opcode_address = opcode_address;
             let (instruction, dst, src, seg, next_cycles, ip_offset, reg_bits) = self.decode_instruction(self.regs.get(&Regs::IP).unwrap().value as usize);
             self.instruction = instruction;
@@ -1055,13 +1056,14 @@ impl CPU {
         while match self.instruction.clone() { Some(instruction) => !instruction.has_flag(OpcodeFlags::Nop.into()), None => true } {
             self.step();
         }
+        while self.next_cycles > 0 {
+            self.step();
+        }
     }
 
     pub fn run_to_nop_from_ip(&mut self) {
-        self.step();
-        while match self.instruction.clone() { Some(instruction) => !instruction.has_flag(OpcodeFlags::Nop.into()), None => true } {
-            self.step();
-        }
+        let ip = self.regs.get(&Regs::IP).unwrap().value;
+        self.run_to_nop(ip);
     }
 
     pub fn set_reg(&mut self, reg: Regs, val: u16) {
@@ -1083,7 +1085,11 @@ impl CPU {
         })
     }
 
-    fn physical_address(seg: u16, offset: u16) -> u32 {
+    pub fn physical_address(seg: u16, offset: u16) -> u32 {
         ((seg as u32) << 4) + (offset as u32)
+    }
+
+    pub fn address_in_ds(&self, offset: u16) -> u32 {
+        Self::physical_address(self.read_reg(Regs::DS).unwrap(), offset)
     }
 }

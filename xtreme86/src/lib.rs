@@ -237,18 +237,18 @@ mod jmp_test {
         f[n]
     }
 
-    //TODO: Make this work!
     #[test]
     fn test_loop() {
         let mut comp = new_cpu_from_file("tests/obj/fib.out");
         comp.run_to_nop(0);
-        for i in 0..=10 {
+        for i in 0..10 as usize {
             if i > 1 {
                 comp.run_to_nop_from_ip();
             }
-            if comp.probe_mem_word(i * 2) != fib(i) {
+            let address = comp.address_in_ds((i * 2) as u16) as usize;
+            if comp.probe_mem_word(address) != fib(i) {
                 println!("{}", i);
-                assert_eq!(comp.probe_mem_word(i * 2), fib(i));
+                assert_eq!(comp.probe_mem_word(address), fib(i));
             }
         }
     }
