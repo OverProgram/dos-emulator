@@ -55,7 +55,7 @@ mod mov_test {
         let mut computer = cpu::CPU::new(code.len());
         computer.load(code, 0);
         computer.execute_next_from(1);
-        assert_eq!(computer.read_mem(0), 0x0);
+        assert_eq!(computer.probe_mem(0), 0x0);
     }
 
     #[test]
@@ -64,7 +64,7 @@ mod mov_test {
         let mut computer = cpu::CPU::new(code.len());
         computer.load(code, 0);
         computer.execute_next_from(1);
-        assert_eq!(computer.read_mem(0), 0x55);
+        assert_eq!(computer.probe_mem(0), 0x55);
     }
 
     #[test]
@@ -96,7 +96,7 @@ mod test_alu {
         let mut computer = cpu::CPU::new(code.len());
         computer.load(code, 0);
         computer.execute_next_from(1);
-        assert_eq!(computer.read_mem(0), 0x10);
+        assert_eq!(computer.probe_mem(0), 0x10);
     }
 
     #[test]
@@ -135,7 +135,7 @@ mod test_alu {
         let mut computer = cpu::CPU::new(code.len());
         computer.load(code, 0);
         computer.execute_next_from(1);
-        assert_eq!(computer.read_mem(0), 0xFE)
+        assert_eq!(computer.probe_mem(0), 0xFE)
     }
 
     #[test]
@@ -224,6 +224,33 @@ mod jmp_test {
         let mut computer = new_cpu_from_file("tests/obj/jmp_cond.out");
         computer.run_to_nop(0);
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x16);
+    }
+
+    fn fib(n: usize) -> u16 {
+        let mut f: Vec<u16>= Vec::with_capacity(n + 2);
+        f.push(0);
+        f.push(1);
+        for i in 2..=n {
+            f.push(f[i - 1] + f[i - 2]);
+        }
+
+        f[n]
+    }
+
+    //TODO: Make this work!
+    #[test]
+    fn test_loop() {
+        let mut comp = new_cpu_from_file("tests/obj/fib.out");
+        comp.run_to_nop(0);
+        for i in 0..=10 {
+            if i > 1 {
+                comp.run_to_nop_from_ip();
+            }
+            if comp.probe_mem_word(i * 2) != fib(i) {
+                println!("{}", i);
+                assert_eq!(comp.probe_mem_word(i * 2), fib(i));
+            }
+        }
     }
 }
 

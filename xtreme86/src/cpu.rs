@@ -1023,8 +1023,12 @@ impl CPU {
         }
     }
 
-    pub fn read_mem(&self, loc: usize) -> u8 {
+    pub fn probe_mem(&self, loc: usize) -> u8 {
         self.ram[loc]
+    }
+
+    pub fn probe_mem_word(&self, loc: usize) -> u16 {
+        (self.ram[loc] as u16) | ((self.ram[loc + 1] as u16) << 8)
     }
 
     pub fn load(&mut self, data: Vec<u8>, loc: usize) {
@@ -1047,6 +1051,13 @@ impl CPU {
 
     pub fn run_to_nop(&mut self, loc: u16) {
         self.regs.get_mut(&Regs::IP).unwrap().value = loc;
+        self.step();
+        while match self.instruction.clone() { Some(instruction) => !instruction.has_flag(OpcodeFlags::Nop.into()), None => true } {
+            self.step();
+        }
+    }
+
+    pub fn run_to_nop_from_ip(&mut self) {
         self.step();
         while match self.instruction.clone() { Some(instruction) => !instruction.has_flag(OpcodeFlags::Nop.into()), None => true } {
             self.step();

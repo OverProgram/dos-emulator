@@ -1,6 +1,7 @@
 use super::{CPU};
 use crate::cpu::{DstArg, Regs, SrcArg};
 use std::rc::Rc;
+use std::net::Shutdown::Read;
 
 
 pub fn jmp(comp: &mut CPU) -> usize {
@@ -55,8 +56,12 @@ pub fn cond_jmp_mnemonic(cond_text: String) -> Rc<dyn Fn(u8) -> Option<String>> 
 
 pub fn lop(condition: Box<dyn Fn(&CPU) -> bool>) -> Rc<dyn Fn(&mut CPU) -> usize> {
     Rc::new(move |this| {
-        this.regs.get_mut(&Regs::CX).unwrap().value.wrapping_sub(1);
-        if this.regs.get(&Regs::CX).unwrap().value == 0 && condition(this) {
+        // this.regs.get_mut(&Regs::CX).unwrap().value.wrapping_sub(1);
+        let new_cx = this.regs.get(&Regs::CX).unwrap().value.wrapping_sub(1);
+        this.regs.get_mut(&Regs::CX).unwrap().value = new_cx;
+        // println!("{}", this.regs.get(&Regs::CX).unwrap().value);
+        if this.regs.get(&Regs::CX).unwrap().value != 0 && condition(this) {
+            println!("jumpin'");
             this.sub_command(0xE9, None, this.dst, 0);
         }
         0
