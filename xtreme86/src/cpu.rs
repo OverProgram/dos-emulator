@@ -5,14 +5,16 @@ mod stack;
 mod jmp;
 mod int;
 mod flags;
+mod instruction;
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use enumflags2::BitFlags;
+use enumflags2::{BitFlags, bitflags};
 use std::fmt::{Debug, Formatter};
 use std::fmt;
 
-#[derive(BitFlags, Copy, Clone, Debug, PartialEq)]
+#[bitflags]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
 enum OpcodeFlags {
     Immediate = 0x0001,
@@ -267,7 +269,7 @@ impl CPU {
         // Move opcodes
         opcodes.insert(0x88, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
         opcodes.insert(0xA0, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), Regs::DS, BitFlags::empty()));
-        for x in 0..7 {
+        for x in 0..8 {
             opcodes.insert(0xB0 + x, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))),Regs::DS, OpcodeFlags::Immediate.into()));
             opcodes.insert(0xB8 + x, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
         }
