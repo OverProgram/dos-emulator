@@ -43,7 +43,7 @@ pub fn near_call(comp: &mut CPU) -> usize {
             let dst = comp.dst.clone().unwrap();
             let val_src = comp.get_src_arg_mut(dst.clone());
             if let Some(src) = val_src {
-                comp.write_to_arg(DstArg::Reg(Regs::IP), src);
+                comp.write_to_arg(DstArg::Reg(Regs::IP), src).unwrap();
             }
         }
     }
@@ -97,7 +97,7 @@ pub fn enter_mnemonic(_: u8) -> Option<String> {
 
 pub fn leave(comp: &mut CPU) -> usize {
     let new_sp = comp.regs.get(&Regs::BP).unwrap().value;
-    comp.write_to_arg(DstArg::Reg(Regs::SP), SrcArg::Word(new_sp));
+    comp.write_to_arg(DstArg::Reg(Regs::SP), SrcArg::Word(new_sp)).unwrap();
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::BP)), 0);
     0
 }

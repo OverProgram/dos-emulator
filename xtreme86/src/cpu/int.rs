@@ -29,8 +29,8 @@ pub fn int(comp: &mut CPU) -> usize {
 
     let new_cs = comp.read_mem_word_seg((num as u16) * 4 + 2, Regs::ES).unwrap();
     let new_ip = comp.read_mem_word_seg((num as u16) * 4, Regs::ES).unwrap();
-    comp.write_to_arg(DstArg::Reg(Regs::CS), SrcArg::Word(new_cs));
-    comp.write_to_arg(DstArg::Reg(Regs::IP), SrcArg::Word(new_ip));
+    comp.write_to_arg(DstArg::Reg(Regs::CS), SrcArg::Word(new_cs)).unwrap();
+    comp.write_to_arg(DstArg::Reg(Regs::IP), SrcArg::Word(new_ip)).unwrap();
 
     comp.set_reg(Regs::ES, tmp_es);
     0

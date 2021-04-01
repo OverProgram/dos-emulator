@@ -11,7 +11,6 @@ use std::rc::Rc;
 use enumflags2::BitFlags;
 use std::fmt::{Debug, Formatter};
 use std::fmt;
-use crate::cpu::reg::Reg;
 
 #[derive(BitFlags, Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
@@ -330,7 +329,7 @@ impl CPU {
             opcodes.insert(0x70 + i, Opcode::new(jmp::cond_jmp(condition), jmp::cond_jmp_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
             i += 1;
         }
-        let loop_conditions: Vec<(Box<dyn Fn(&Self) -> bool>, String)> = vec![(Box::new(|this: &Self| !this.check_flag(CPUFlags::ZERO)), String::from("NE")), (Box::new(|this: &Self| this.check_flag(CPUFlags::ZERO)), String::from("E")), (Box::new(|this: &Self| true), String::from(""))];
+        let loop_conditions: Vec<(Box<dyn Fn(&Self) -> bool>, String)> = vec![(Box::new(|this: &Self| !this.check_flag(CPUFlags::ZERO)), String::from("NE")), (Box::new(|this: &Self| this.check_flag(CPUFlags::ZERO)), String::from("E")), (Box::new(|_: &Self| true), String::from(""))];
         i = 0;
         for (condition, cond_text) in loop_conditions {
             opcodes.insert(0xE0 + i, Opcode::new(jmp::lop(condition), jmp::loop_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
@@ -380,7 +379,6 @@ impl CPU {
             self.next_cycles += int::int(self);
         } else {
             let opcode_address =  (self.regs[&Regs::CS].value, self.regs[&Regs::IP].value);
-            println!("now executing {}", self.get_instruction_text(opcode_address.1 as usize).unwrap());
             self.opcode_address = opcode_address;
             let (instruction, dst, src, seg, next_cycles, ip_offset, reg_bits) = self.decode_instruction(self.regs.get(&Regs::IP).unwrap().value as usize);
             self.instruction = instruction;

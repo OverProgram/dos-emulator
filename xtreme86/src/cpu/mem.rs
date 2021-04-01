@@ -41,7 +41,7 @@ pub fn ldw(comp: &mut CPU) -> usize {
         Some(DstArg::Reg16(reg)) => DstArg::Reg16(reg),
         _ => panic!("LDS/LES must get a Reg16 as dst")
     };
-    comp.write_to_arg(dst, SrcArg::Word((value & 0xFFFF) as u16));
+    comp.write_to_arg(dst, SrcArg::Word((value & 0xFFFF) as u16)).unwrap();
     0
 }
 
@@ -56,7 +56,7 @@ pub fn les_mnemonic(_: u8) -> Option<String> {
 pub fn lea(comp: &mut CPU) -> usize {
     let new_dst = SrcArg::Word(comp.src_ptr.unwrap());
     let old_dst = comp.dst.unwrap();
-    comp.write_to_arg(old_dst, new_dst);
+    comp.write_to_arg(old_dst, new_dst).unwrap();
     0
 }
 
@@ -70,11 +70,11 @@ pub fn lods(comp: &mut CPU) -> usize {
     match comp.get_src_arg_mut(comp_dst) {
         Some(SrcArg::Word(_)) => {
             let src = comp.get_src_arg_mut(DstArg::Ptr16(src_loc));
-            comp.write_to_arg(DstArg::Reg8(0), src.unwrap());
+            comp.write_to_arg(DstArg::Reg8(0), src.unwrap()).unwrap();
         }
         Some(SrcArg::Byte(_)) => {
             let src = comp.get_src_arg_mut(DstArg::Ptr8(src_loc));
-            comp.write_to_arg(DstArg::Reg(Regs::AX), src.unwrap());
+            comp.write_to_arg(DstArg::Reg(Regs::AX), src.unwrap()).unwrap();
         }
         _ => panic!("LODS can only get a byte or word")
     }

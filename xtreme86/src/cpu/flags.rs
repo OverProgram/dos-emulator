@@ -1,4 +1,4 @@
-use crate::cpu::{CPU, CPUFlags, Regs, DstArg, SrcArg};
+use crate::cpu::{CPU, CPUFlags, Regs, SrcArg};
 use crate::cpu::alu::{sub_with_carry_8_bit, sub_with_carry_16_bit};
 
 pub fn clc(comp: &mut CPU) -> usize {
