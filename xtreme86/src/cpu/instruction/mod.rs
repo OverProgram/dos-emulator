@@ -1,6 +1,6 @@
-use crate::cpu::instruction::data::Opcode;
+use crate::cpu::instruction::opcode::Opcode;
 
-mod data;
+mod opcode;
 mod actions;
 
 pub struct InstructionDecoder {
