@@ -3,6 +3,7 @@ use crate::cpu::{CPU, Regs};
 use std::option::Option::Some;
 use crate::cpu::instruction::actions::mem::{nop, mov, ldw, lea, lods};
 use std::sync::Arc;
+use std::rc::Rc;
 
 #[bitflags]
 #[repr(u32)]
@@ -35,7 +36,7 @@ pub enum Placeholder {
     Ptr
 }
 
-type MnemonicFunc = Arc<dyn Fn(u8) -> String + Send + Sync>;
+type MnemonicFunc = Rc<dyn Fn(u8) -> String>;
 
 #[derive(Clone)]
 pub enum Mnemonic {
@@ -52,7 +53,7 @@ impl Mnemonic {
     }
 }
 
-type OpcodeAction = Arc<dyn Fn(&mut CPU) -> usize + Send + Sync>;
+type OpcodeAction = Rc<dyn Fn(&mut CPU) -> usize>;
 
 #[derive(Clone)]
 pub struct Opcode {

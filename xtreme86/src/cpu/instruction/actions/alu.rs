@@ -49,16 +49,16 @@ pub fn alu_dispatch_two_args(comp: &mut CPU) -> usize {
     }
 }
 
-pub fn alu_dispatch_two_args_mnemonic(reg_bits: u8) -> Option<String> {
-    Some(String::from(match reg_bits {
+pub fn alu_dispatch_two_args_mnemonic(reg_bits: u8) -> String {
+    String::from(match reg_bits {
         0b000 => "ADD",
         0b001 => "OR",
         0b010 => "ADC",
         0b100 => "AND",
         0b101 => "SUB",
         0b110 => "XOR",
-        _ => return None
-    }))
+        _ => panic!("invalid reg_bits value")
+    })
 }
 
 pub fn alu_dispatch_one_arg(comp: &mut CPU) -> usize {
@@ -74,15 +74,15 @@ pub fn alu_dispatch_one_arg(comp: &mut CPU) -> usize {
     }
 }
 
-pub fn alu_dispatch_one_arg_mnemonic(reg_bits: u8) -> Option<String> {
-    Some(String::from(match reg_bits {
+pub fn alu_dispatch_one_arg_mnemonic(reg_bits: u8) -> String {
+    String::from(match reg_bits {
         0b000 => "INC",
         0b001 => "DEC",
         0b010 | 0b011 => "CALL",
         0b100 | 0b101 => "JMP",
         0b110 => "PUSH",
-        _ => return None
-    }))
+        _ => panic!("invalid reg_bits value")
+    })
 }
 
 pub fn mul_dispatch(comp: &mut CPU) -> usize {
@@ -97,16 +97,16 @@ pub fn mul_dispatch(comp: &mut CPU) -> usize {
     }
 }
 
-pub fn mul_dispatch_mnemonic(reg_bits: u8) -> Option<String> {
-    Some(String::from(match reg_bits {
+pub fn mul_dispatch_mnemonic(reg_bits: u8) -> String {
+    String::from(match reg_bits {
         0b010 => "NOT",
         0b011 => "NEG",
         0b100 => "MUL",
         0b101 => "IMUL",
         0b110 => "DIV",
         0b111 => "IDIV",
-        _ => return None
-    }))
+        _ => panic!("invalid reg_bits value")
+    })
 }
 
 pub fn add(comp: &mut CPU) -> usize {

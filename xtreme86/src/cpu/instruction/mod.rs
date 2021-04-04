@@ -9,9 +9,9 @@ pub struct InstructionDecoder {
 }
 
 impl InstructionDecoder {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            opcode_data: data::OPCODE_DATA.clone()
+            opcode_data: Opcode::get_opcode_data()
         }
     }
 }
