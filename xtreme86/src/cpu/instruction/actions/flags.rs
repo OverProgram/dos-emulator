@@ -1,5 +1,5 @@
 use crate::cpu::{CPU, CPUFlags, Regs, SrcArg};
-use crate::cpu::alu::{sub_with_carry_8_bit, sub_with_carry_16_bit};
+use crate::cpu::instruction::actions::alu::{sub_with_carry_8_bit, sub_with_carry_16_bit};
 
 pub fn clc(comp: &mut CPU) -> usize {
     comp.clear_flag(CPUFlags::CARRY);

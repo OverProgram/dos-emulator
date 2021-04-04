@@ -7,11 +7,15 @@ class Function:
         self.module = module
 
     def __str__(self):
-        return "{}::{}".format(self.name, self.module)
+        return "Arc::new({}::{})".format(self.module, self.name)
 
 
 class Opcode:
     SEG_DS = "DS"
+
+    NUM_ARGS_ZERO = "NumArgs::Zero"
+    NUM_ARGS_ONE = "NumArgs::One"
+    NUM_ARGS_TWO = "NumArgs::Two"
 
     FLAG_IMMEDIATE = "Immediate"
     FLAG_SIZE_MISMATCH = "SizeMismatch"
@@ -35,7 +39,10 @@ class Opcode:
         return Opcode(0, Function("undefined", ""), "UD")
 
     def get_mnemonic(self):
-        return str(self.mnemonic)
+        if type(self.mnemonic) == str:
+            return "Mnemonic::Static(String::from(\"{}\"))".format(self.mnemonic)
+        elif type(self.mnemonic) == Function:
+            return "Mnemonic::Dynamic({!s})".format(self.mnemonic)
 
     def get_shorthand1(self):
         if self.shorthand1 is None:
@@ -62,7 +69,8 @@ class Opcode:
 
     def __str__(self):
         return \
-            "Opcode{ num_args: {}, action: {}, mnemonic: {}, shorthand1: {}, shorthand2: {}, flags: {}, segment: {} }" \
+            "Some(Opcode{{ num_args: {!s}, action: {!s}, mnemonic: {!s}, shorthand1: {!s}," \
+            " shorthand2: {!s}, flags: {!s}, segment: Regs::{!s} }})" \
             .format(self.num_args, self.action, self.get_mnemonic(), self.get_shorthand1(), self.get_shorthand2(),
                     self.get_flags(), self.segment)
 
@@ -70,21 +78,30 @@ class Opcode:
 def make_opcodes():
     opcodes = {}
 
+    opcodes[0x01] = Opcode(Opcode.NUM_ARGS_TWO, Function("mov", "mem"), "mov")
+
     opcodes_array = []
     for i in range(256):
         if i in opcodes:
             opcodes_array.append(str(opcodes[i]))
         else:
-            opcodes_array.append("Opcode")
+            opcodes_array.append("None")
 
-    return
+    return opcodes_array
 
 
 def dump_opcodes(opcodes, file):
-    with file.open('w+') as f:
-        f.write("use crate::cpu::instruction::opcode::Opcode\n\nconst OPCODE_DATA: [Opcodes; 256] = [\n")
-        f.writelines([str(opcode) for opcode in opcodes])
-        f.write("];\n\n")
+    with file.open('w') as f:
+        f.write("use crate::cpu::instruction::opcode::{Opcode, Mnemonic, NumArgs};\n"
+                "use crate::cpu::{Regs};\n"
+                "use crate::cpu::instruction::actions::{alu, flags, int, jmp, mem, stack};\n"
+                "use enumflags2::make_bitflags;\n"
+                "use crate::cpu::instruction::opcode::OpcodeFlags;\n"
+                "use std::sync::Arc;\n\n"
+                "lazy_static! {\n"
+                "\tpub static ref OPCODE_DATA: [Option<Opcode>; 256] = [\n")
+        f.writelines(['\t\t' + str(opcode) + ',\n' for opcode in opcodes])
+        f.write("\t];\n}\n\n")
 
 
 def main():

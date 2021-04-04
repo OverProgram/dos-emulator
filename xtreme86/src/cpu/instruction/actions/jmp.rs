@@ -1,5 +1,4 @@
-use super::{CPU};
-use crate::cpu::{DstArg, Regs, SrcArg};
+use crate::cpu::{CPU, DstArg, Regs, SrcArg};
 use std::rc::Rc;
 
 

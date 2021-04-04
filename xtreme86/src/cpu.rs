@@ -1,10 +1,4 @@
 mod reg;
-mod mem;
-mod alu;
-mod stack;
-mod jmp;
-mod int;
-mod flags;
 mod instruction;
 
 use std::collections::HashMap;
@@ -12,6 +6,7 @@ use std::rc::Rc;
 use enumflags2::{BitFlags, bitflags};
 use std::fmt::{Debug, Formatter};
 use std::fmt;
+use crate::cpu::instruction::actions::{int, alu};
 
 #[bitflags]
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -265,92 +260,92 @@ impl CPU {
         // Define opcodes
         let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
         //NOP
-        opcodes.insert(0x90, Opcode::new(Rc::new(mem::nop), Rc::new(mem::nop_mnemonic), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::Nop.into()));
-        // Move opcodes
-        opcodes.insert(0x88, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xA0, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), Regs::DS, BitFlags::empty()));
-        for x in 0..8 {
-            opcodes.insert(0xB0 + x, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))),Regs::DS, OpcodeFlags::Immediate.into()));
-            opcodes.insert(0xB8 + x, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
-        }
-        opcodes.insert(0xC6, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
-        opcodes.insert(0xC5, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::lds_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDWord.into()));
-        opcodes.insert(0xC4, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::les_mnemonic), NumArgs::Two, 1, None, Regs::ES, OpcodeFlags::ForceDWord.into()));
-        opcodes.insert(0x8D, Opcode::new(Rc::new(mem::lea), Rc::new(mem::lea_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDirection.into()));
-        opcodes.insert(0xAC, Opcode::new(Rc::new(mem::lods), Rc::new(mem::lods_mnemonic), NumArgs::One, 1, Some((Placeholder::Byte(0), None)), Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xAD, Opcode::new(Rc::new(mem::lods), Rc::new(mem::lods_mnemonic), NumArgs::One, 1, Some((Placeholder::Word(0), None)), Regs::DS, BitFlags::empty()));
-        // Conversion
-        opcodes.insert(0x98, Opcode::new(Rc::new(mem::cbw), Rc::new(mem::cbw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0x99, Opcode::new(Rc::new(mem::cdw), Rc::new(mem::cdw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        // ALU opcodes
-        let mut alu_opcodes: Vec<(Rc<dyn Fn(&mut CPU) -> usize>, Rc<dyn Fn(u8) -> Option<String>>, u8)> = Vec::new();
-        alu_opcodes.push((Rc::new(alu::add), Rc::new(alu::add_mnemonic), 0x00));
-        alu_opcodes.push((Rc::new(alu::sub), Rc::new(alu::sub_mnemonic), 0x28));
-        alu_opcodes.push((Rc::new(alu::xor), Rc::new(alu::xor_mnemonic), 0x30));
-        alu_opcodes.push((Rc::new(alu::and), Rc::new(alu::and_mnemonic), 0x20));
-        alu_opcodes.push((Rc::new(alu::or), Rc::new(alu::or_mnemonic), 0x08));
-        for (instruction, mnemonic, offset) in alu_opcodes.into_iter() {
-            opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), mnemonic.clone(), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
-            opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), mnemonic.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
-        }
-        opcodes.insert(0x80, Opcode::new(Rc::new(alu::alu_dispatch_two_args), Rc::new(alu::alu_dispatch_two_args_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
-        for x in 0..7 {
-            opcodes.insert(0x40 + x, Opcode::new(Rc::new(alu::inc),Rc::new(alu::inc_mnemonic), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
-            opcodes.insert(0x48 + x, Opcode::new(Rc::new(alu::dec), Rc::new(alu::dec_mnemonic), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
-        }
-        opcodes.insert(0x83, Opcode::new(Rc::new(alu::alu_dispatch_two_args), Rc::new(alu::alu_dispatch_two_args_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
-        opcodes.insert(0xFE, Opcode::new(Rc::new(alu::alu_dispatch_one_arg), Rc::new(alu::alu_dispatch_one_arg_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xF6, Opcode::new(Rc::new(alu::mul_dispatch), Rc::new(alu::mul_dispatch_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0x37, Opcode::new(Rc::new(alu::aaa), Rc::new(alu::aaa_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xD5, Opcode::new(Rc::new(alu::aad), Rc::new(alu::aad_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
-        opcodes.insert(0x3F, Opcode::new(Rc::new(alu::aas), Rc::new(alu::aas_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0x27, Opcode::new(Rc::new(alu::daa), Rc::new(alu::daa_mnemonic),NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0x14, Opcode::new(Rc::new(alu::adc), Rc::new(alu::adc_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg8(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
-        opcodes.insert(0x10, Opcode::new(Rc::new(alu::adc), Rc::new(alu::adc_mnemonic), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
-        // Stack opcodes
-        for x in 0..7 {
-            opcodes.insert(0x50 + x, Opcode::new(Rc::new(stack::push), Rc::new(stack::push_mnemonic), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
-            opcodes.insert(0x58 + x, Opcode::new(Rc::new(stack::pop), Rc::new(stack::pop_mnemonic), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
-        }
-        opcodes.insert(0x8F, Opcode::new(Rc::new(stack::pop), Rc::new(stack::pop_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xE8, Opcode::new(Rc::new(stack::near_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
-        opcodes.insert(0x9A, Opcode::new(Rc::new(stack::far_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
-        opcodes.insert(0xC3, Opcode::new(Rc::new(stack::ret), Rc::new(stack::ret_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
-        opcodes.insert(0xC8, Opcode::new(Rc::new(stack::enter), Rc::new(stack::enter_mnemonic), NumArgs::Two, 1, Some((Placeholder::Imm, Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
-        opcodes.insert(0xC9, Opcode::new(Rc::new(stack::leave), Rc::new(stack::leave_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        // Jump opcodes
-        opcodes.insert(0xE9, Opcode::new(Rc::new(jmp::jmp), Rc::new(jmp::jmp_mnemonic), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate.into()));
-        let flag_condition: Vec<(Box<dyn Fn(&Self) -> bool>, String)> = vec![(Box::new(|this: &Self| this.check_flag(CPUFlags::OVERFLOW)), String::from("O")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}), String::from("NO")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY)}), String::from("C")),
-                                                                                                                                                                (Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY)}), String::from("C")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::ZERO)}), String::from("E")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::ZERO)}), String::from("NE")),
-                                                                                                                                                                (Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY) || this.check_flag(CPUFlags::ZERO)}), String::from("BE")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY) && !this.check_flag(CPUFlags::ZERO)}), String::from("A")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN)}), String::from("S")),
-                                                                                                                                                                (Box::new(|this: &Self| {!this.check_flag(CPUFlags::SIGN)}), String::from("NS")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::PARITY)}), String::from("P")), (Box::new(|this: &Self| {this.check_flag(!CPUFlags::PARITY)}), String::from("NP")),
-                                                                                                                                                                (Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), String::from("L")), (Box::new(|this: &Self| {!this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), String::from("GE")), (Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW) || this.check_flag(CPUFlags::ZERO)}), String::from("LE")),
-                                                                                                                                                                (Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN) && !this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), String::from("G"))];
-        let mut i = 0;
-        for (condition, cond_text) in flag_condition {
-            opcodes.insert(0x70 + i, Opcode::new(jmp::cond_jmp(condition), jmp::cond_jmp_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
-            i += 1;
-        }
-        let loop_conditions: Vec<(Box<dyn Fn(&Self) -> bool>, String)> = vec![(Box::new(|this: &Self| !this.check_flag(CPUFlags::ZERO)), String::from("NE")), (Box::new(|this: &Self| this.check_flag(CPUFlags::ZERO)), String::from("E")), (Box::new(|_: &Self| true), String::from(""))];
-        i = 0;
-        for (condition, cond_text) in loop_conditions {
-            opcodes.insert(0xE0 + i, Opcode::new(jmp::lop(condition), jmp::loop_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
-            i += 1;
-        }
-        // Flag opcodes
-        opcodes.insert(0xF8, Opcode::new(Rc::new(flags::clc), Rc::new(flags::clc_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xFC, Opcode::new(Rc::new(flags::cld), Rc::new(flags::cld_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xFA, Opcode::new(Rc::new(flags::cli), Rc::new(flags::cli_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0xF5, Opcode::new(Rc::new(flags::cmc), Rc::new(flags::cmc_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0x38, Opcode::new(Rc::new(flags::cmp), Rc::new(flags::cmp_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::SizeMismatch.into()));
-        opcodes.insert(0x3C, Opcode::new(Rc::new(flags::cmp), Rc::new(flags::cmp_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
-        opcodes.insert(0xA6, Opcode::new(Rc::new(flags::cmps), Rc::new(flags::cmps_mnemonic), NumArgs::Zero, 1, Some((Placeholder::Reg16(6), Some(Placeholder::Reg16(7)))), Regs::DS, BitFlags::empty()));
-        opcodes.insert(0x9F, Opcode::new(Rc::new(flags::lahf), Rc::new(flags::lahf_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        // Interrupt opcodes
-        opcodes.insert(0xCD, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
-        opcodes.insert(0xCC, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::Immediate.into()));
-        opcodes.insert(0xCF, Opcode::new(Rc::new(int::iret), Rc::new(int::iret_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
-        opcodes.insert(0x62, Opcode::new(Rc::new(int::bound), Rc::new(int::bound_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDWord.into()));
+        // opcodes.insert(0x90, Opcode::new(Rc::new(mem::nop), Rc::new(mem::nop_mnemonic), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::Nop.into()));
+        // // Move opcodes
+        // opcodes.insert(0x88, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0xA0, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Ptr))), Regs::DS, BitFlags::empty()));
+        // for x in 0..8 {
+        //     opcodes.insert(0xB0 + x, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg8(x), Some(Placeholder::Imm))),Regs::DS, OpcodeFlags::Immediate.into()));
+        //     opcodes.insert(0xB8 + x, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg16(x), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
+        // }
+        // opcodes.insert(0xC6, Opcode::new(Rc::new(mem::mov), Rc::new(mem::mov_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
+        // opcodes.insert(0xC5, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::lds_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDWord.into()));
+        // opcodes.insert(0xC4, Opcode::new(Rc::new(mem::ldw), Rc::new(mem::les_mnemonic), NumArgs::Two, 1, None, Regs::ES, OpcodeFlags::ForceDWord.into()));
+        // opcodes.insert(0x8D, Opcode::new(Rc::new(mem::lea), Rc::new(mem::lea_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDirection.into()));
+        // opcodes.insert(0xAC, Opcode::new(Rc::new(mem::lods), Rc::new(mem::lods_mnemonic), NumArgs::One, 1, Some((Placeholder::Byte(0), None)), Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0xAD, Opcode::new(Rc::new(mem::lods), Rc::new(mem::lods_mnemonic), NumArgs::One, 1, Some((Placeholder::Word(0), None)), Regs::DS, BitFlags::empty()));
+        // // Conversion
+        // opcodes.insert(0x98, Opcode::new(Rc::new(mem::cbw), Rc::new(mem::cbw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0x99, Opcode::new(Rc::new(mem::cdw), Rc::new(mem::cdw_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // // ALU opcodes
+        // let mut alu_opcodes: Vec<(Rc<dyn Fn(&mut CPU) -> usize>, Rc<dyn Fn(u8) -> Option<String>>, u8)> = Vec::new();
+        // alu_opcodes.push((Rc::new(alu::add), Rc::new(alu::add_mnemonic), 0x00));
+        // alu_opcodes.push((Rc::new(alu::sub), Rc::new(alu::sub_mnemonic), 0x28));
+        // alu_opcodes.push((Rc::new(alu::xor), Rc::new(alu::xor_mnemonic), 0x30));
+        // alu_opcodes.push((Rc::new(alu::and), Rc::new(alu::and_mnemonic), 0x20));
+        // alu_opcodes.push((Rc::new(alu::or), Rc::new(alu::or_mnemonic), 0x08));
+        // for (instruction, mnemonic, offset) in alu_opcodes.into_iter() {
+        //     opcodes.insert(0x00 + offset, Opcode::new(instruction.clone(), mnemonic.clone(), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
+        //     opcodes.insert(0x04 + offset, Opcode::new(instruction.clone(), mnemonic.clone(), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
+        // }
+        // opcodes.insert(0x80, Opcode::new(Rc::new(alu::alu_dispatch_two_args), Rc::new(alu::alu_dispatch_two_args_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate.into()));
+        // for x in 0..7 {
+        //     opcodes.insert(0x40 + x, Opcode::new(Rc::new(alu::inc),Rc::new(alu::inc_mnemonic), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+        //     opcodes.insert(0x48 + x, Opcode::new(Rc::new(alu::dec), Rc::new(alu::dec_mnemonic), NumArgs::Zero, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+        // }
+        // opcodes.insert(0x83, Opcode::new(Rc::new(alu::alu_dispatch_two_args), Rc::new(alu::alu_dispatch_two_args_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
+        // opcodes.insert(0xFE, Opcode::new(Rc::new(alu::alu_dispatch_one_arg), Rc::new(alu::alu_dispatch_one_arg_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0xF6, Opcode::new(Rc::new(alu::mul_dispatch), Rc::new(alu::mul_dispatch_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0x37, Opcode::new(Rc::new(alu::aaa), Rc::new(alu::aaa_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0xD5, Opcode::new(Rc::new(alu::aad), Rc::new(alu::aad_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
+        // opcodes.insert(0x3F, Opcode::new(Rc::new(alu::aas), Rc::new(alu::aas_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0x27, Opcode::new(Rc::new(alu::daa), Rc::new(alu::daa_mnemonic),NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0x14, Opcode::new(Rc::new(alu::adc), Rc::new(alu::adc_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg8(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
+        // opcodes.insert(0x10, Opcode::new(Rc::new(alu::adc), Rc::new(alu::adc_mnemonic), NumArgs::Two, 1, None, Regs::DS, BitFlags::empty()));
+        // // Stack opcodes
+        // for x in 0..7 {
+        //     opcodes.insert(0x50 + x, Opcode::new(Rc::new(stack::push), Rc::new(stack::push_mnemonic), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+        //     opcodes.insert(0x58 + x, Opcode::new(Rc::new(stack::pop), Rc::new(stack::pop_mnemonic), NumArgs::One, 1, Some((Placeholder::Reg16(x), None)), Regs::DS, BitFlags::empty()));
+        // }
+        // opcodes.insert(0x8F, Opcode::new(Rc::new(stack::pop), Rc::new(stack::pop_mnemonic), NumArgs::One, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0xE8, Opcode::new(Rc::new(stack::near_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
+        // opcodes.insert(0x9A, Opcode::new(Rc::new(stack::far_call), Rc::new(stack::call_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
+        // opcodes.insert(0xC3, Opcode::new(Rc::new(stack::ret), Rc::new(stack::ret_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceWord));
+        // opcodes.insert(0xC8, Opcode::new(Rc::new(stack::enter), Rc::new(stack::enter_mnemonic), NumArgs::Two, 1, Some((Placeholder::Imm, Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
+        // opcodes.insert(0xC9, Opcode::new(Rc::new(stack::leave), Rc::new(stack::leave_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // // Jump opcodes
+        // opcodes.insert(0xE9, Opcode::new(Rc::new(jmp::jmp), Rc::new(jmp::jmp_mnemonic), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate.into()));
+        // let flag_condition: Vec<(Box<dyn Fn(&Self) -> bool>, String)> = vec![(Box::new(|this: &Self| this.check_flag(CPUFlags::OVERFLOW)), String::from("O")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::OVERFLOW)}), String::from("NO")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY)}), String::from("C")),
+        //                                                                                                                                                         (Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY)}), String::from("C")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::ZERO)}), String::from("E")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::ZERO)}), String::from("NE")),
+        //                                                                                                                                                         (Box::new(|this: &Self| {this.check_flag(CPUFlags::CARRY) || this.check_flag(CPUFlags::ZERO)}), String::from("BE")), (Box::new(|this: &Self| {!this.check_flag(CPUFlags::CARRY) && !this.check_flag(CPUFlags::ZERO)}), String::from("A")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN)}), String::from("S")),
+        //                                                                                                                                                         (Box::new(|this: &Self| {!this.check_flag(CPUFlags::SIGN)}), String::from("NS")), (Box::new(|this: &Self| {this.check_flag(CPUFlags::PARITY)}), String::from("P")), (Box::new(|this: &Self| {this.check_flag(!CPUFlags::PARITY)}), String::from("NP")),
+        //                                                                                                                                                         (Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), String::from("L")), (Box::new(|this: &Self| {!this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), String::from("GE")), (Box::new(|this: &Self| {this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW) || this.check_flag(CPUFlags::ZERO)}), String::from("LE")),
+        //                                                                                                                                                         (Box::new(|this: &Self| {this.check_flag(CPUFlags::SIGN) && !this.check_flags_not_equal(CPUFlags::SIGN, CPUFlags::OVERFLOW)}), String::from("G"))];
+        // let mut i = 0;
+        // for (condition, cond_text) in flag_condition {
+        //     opcodes.insert(0x70 + i, Opcode::new(jmp::cond_jmp(condition), jmp::cond_jmp_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
+        //     i += 1;
+        // }
+        // let loop_conditions: Vec<(Box<dyn Fn(&Self) -> bool>, String)> = vec![(Box::new(|this: &Self| !this.check_flag(CPUFlags::ZERO)), String::from("NE")), (Box::new(|this: &Self| this.check_flag(CPUFlags::ZERO)), String::from("E")), (Box::new(|_: &Self| true), String::from(""))];
+        // i = 0;
+        // for (condition, cond_text) in loop_conditions {
+        //     opcodes.insert(0xE0 + i, Opcode::new(jmp::lop(condition), jmp::loop_mnemonic(cond_text), NumArgs::One, 1, None, Regs::CS, OpcodeFlags::Immediate | OpcodeFlags::SizeMismatch));
+        //     i += 1;
+        // }
+        // // Flag opcodes
+        // opcodes.insert(0xF8, Opcode::new(Rc::new(flags::clc), Rc::new(flags::clc_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0xFC, Opcode::new(Rc::new(flags::cld), Rc::new(flags::cld_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0xFA, Opcode::new(Rc::new(flags::cli), Rc::new(flags::cli_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0xF5, Opcode::new(Rc::new(flags::cmc), Rc::new(flags::cmc_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0x38, Opcode::new(Rc::new(flags::cmp), Rc::new(flags::cmp_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::SizeMismatch.into()));
+        // opcodes.insert(0x3C, Opcode::new(Rc::new(flags::cmp), Rc::new(flags::cmp_mnemonic), NumArgs::Two, 1, Some((Placeholder::Reg(0), Some(Placeholder::Imm))), Regs::DS, OpcodeFlags::Immediate.into()));
+        // opcodes.insert(0xA6, Opcode::new(Rc::new(flags::cmps), Rc::new(flags::cmps_mnemonic), NumArgs::Zero, 1, Some((Placeholder::Reg16(6), Some(Placeholder::Reg16(7)))), Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0x9F, Opcode::new(Rc::new(flags::lahf), Rc::new(flags::lahf_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // // Interrupt opcodes
+        // opcodes.insert(0xCD, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, None, Regs::DS, OpcodeFlags::Immediate | OpcodeFlags::ForceByte));
+        // opcodes.insert(0xCC, Opcode::new(Rc::new(int::int_req), Rc::new(int::int_mnemonic), NumArgs::One, 1, Some((Placeholder::Byte(3), None)), Regs::DS, OpcodeFlags::Immediate.into()));
+        // opcodes.insert(0xCF, Opcode::new(Rc::new(int::iret), Rc::new(int::iret_mnemonic), NumArgs::Zero, 1, None, Regs::DS, BitFlags::empty()));
+        // opcodes.insert(0x62, Opcode::new(Rc::new(int::bound), Rc::new(int::bound_mnemonic), NumArgs::Two, 1, None, Regs::DS, OpcodeFlags::ForceDWord.into()));
 
         Self {
             ram,

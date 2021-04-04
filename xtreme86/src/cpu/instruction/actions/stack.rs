@@ -1,5 +1,4 @@
-use super::{CPU};
-use crate::cpu::{Regs, DstArg, SrcArg};
+use crate::cpu::{CPU, Regs, DstArg, SrcArg};
 
 
 pub fn push(comp: &mut CPU) -> usize {

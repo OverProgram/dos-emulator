@@ -1,5 +1,4 @@
-use super::{CPU};
-use crate::cpu::{Regs, SrcArg, DstArg, CPUFlags};
+use crate::cpu::{CPU, Regs, SrcArg, DstArg, CPUFlags};
 
 pub fn mov(comp: &mut CPU) -> usize {
     comp.write_to_arg(comp.dst.clone().unwrap(), comp.src.clone().unwrap()).unwrap();

@@ -1,16 +1,17 @@
 use crate::cpu::instruction::opcode::Opcode;
 
 mod opcode;
-mod actions;
+pub mod actions;
+mod data;
 
 pub struct InstructionDecoder {
-    opcode_data: [Opcode; u8::MAX as usize],
+    opcode_data: [Option<Opcode>; 256],
 }
 
 impl InstructionDecoder {
     fn new() -> Self {
         Self {
-            opcode_data: Opcode::get_opcode_data()
+            opcode_data: data::OPCODE_DATA.clone()
         }
     }
 }
