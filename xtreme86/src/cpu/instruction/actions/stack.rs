@@ -11,20 +11,12 @@ pub fn push(comp: &mut CPU, instruction: Instruction) -> usize {
     1
 }
 
-pub fn push_mnemonic(_: u8) -> Option<String> {
-                                            Some(String::from("PUSH"))
-                                                                       }
-
 pub fn pop(comp: &mut CPU, instruction: Instruction) -> usize {
     let val = SrcArg::Word(comp.read_mem_word_seg(comp.read_reg(Regs::SP).unwrap() + 1, Regs::SS).unwrap());
     comp.write_to_arg(instruction.dst.clone().unwrap(), val).unwrap();
     comp.regs.get_mut(&Regs::SP).unwrap().value += 2;
     1
 }
-
-pub fn pop_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("POP"))
-                                                                     }
 
 pub fn far_call(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::CS)), 0b110);
@@ -51,19 +43,11 @@ pub fn near_call(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn call_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("CALL"))
-                                                                       }
-
-pub fn ret(comp: &mut CPU, instruction: Instruction) -> usize {
+pub fn ret(comp: &mut CPU, _: Instruction) -> usize {
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::IP)), 0b000);
     comp.sub_command(0xE9, None, Some(DstArg::Reg(Regs::IP)), 0b000);
     0
 }
-
-pub fn ret_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("RET"))
-                                                                     }
 
 pub fn enter(comp: &mut CPU, instruction: Instruction) -> usize {
     let dst_arg = instruction.dst.unwrap();
@@ -92,17 +76,9 @@ pub fn enter(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn enter_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("ENTER"))
-}
-
-pub fn leave(comp: &mut CPU, instruction: Instruction) -> usize {
+pub fn leave(comp: &mut CPU, _: Instruction) -> usize {
     let new_sp = comp.regs.get(&Regs::BP).unwrap().value;
     comp.write_to_arg(DstArg::Reg(Regs::SP), SrcArg::Word(new_sp)).unwrap();
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::BP)), 0);
     0
-}
-
-pub fn leave_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("LEAVE"))
 }

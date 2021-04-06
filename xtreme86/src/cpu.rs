@@ -2,13 +2,10 @@ mod reg;
 mod instruction;
 
 use std::collections::HashMap;
-use std::rc::Rc;
-use enumflags2::{BitFlags, bitflags};
-use std::fmt::{Debug, Formatter};
-use std::fmt;
+use std::fmt::{Debug};
 use crate::cpu::instruction::actions::{int, alu};
-use crate::cpu::instruction::{data, InstructionDecoder};
-use crate::cpu::instruction::args::{SrcArg, DstArg, Size};
+use crate::cpu::instruction::{InstructionDecoder};
+use crate::cpu::instruction::args::{SrcArg, DstArg};
 use crate::cpu::instruction::opcode::OpcodeFlags;
 
 // #[bitflags`]
@@ -40,14 +37,14 @@ impl CPUFlags {
 
 mod exceptions {
     pub const DIVIDE_BY_ZERO: u8 = 0x00;
-    pub const SINGLE_STEP_INSTRUCTION: u8 = 0x01;
-    pub const NMI: u8 = 0x02;
-    pub const BREAKPOINT: u8 = 0x03;
+    // pub const SINGLE_STEP_INSTRUCTION: u8 = 0x01;
+    // pub const NMI: u8 = 0x02;
+    // pub const BREAKPOINT: u8 = 0x03;
     pub const INTO: u8 = 0x04;
     pub const BOUND: u8 = 0x05;
     pub const INVALID_OPCODE: u8 = 0x06;
     pub const NO_EXTENSION: u8 = 0x07;
-    pub const IVT_TOO_SMALL: u8 = 0x08;
+    // pub const IVT_TOO_SMALL: u8 = 0x08;
 }
 
 // #[derive(Clone, Copy, Debug)]
@@ -545,21 +542,21 @@ impl CPU {
         self.regs[&Regs::FLAGS].value & flag1 != self.regs[&Regs::FLAGS].value & flag2
     }
 
-    fn read_ip(&self, ip: &mut usize, next_cycles: &mut usize) -> u8 {
-        let tmp = *ip;
-        *ip += 1;
-        *next_cycles += 1;
-        let addr = Self::physical_address(self.regs.get(&Regs::CS).unwrap().value, tmp as u16);
-        self.ram[addr as usize]
-    }
+    // fn read_ip(&self, ip: &mut usize, next_cycles: &mut usize) -> u8 {
+    //     let tmp = *ip;
+    //     *ip += 1;
+    //     *next_cycles += 1;
+    //     let addr = Self::physical_address(self.regs.get(&Regs::CS).unwrap().value, tmp as u16);
+    //     self.ram[addr as usize]
+    // }
 
-    fn read_ip_mut(&mut self) -> u8 {
-        let addr = Self::physical_address(self.regs.get(&Regs::CS).unwrap().value, self.regs.get(&Regs::IP).unwrap().value);
-        let val = self.ram[addr as usize];
-        self.regs.get_mut(&Regs::IP).unwrap().value += 1;
-        self.next_cycles += 1;
-        val
-    }
+    // fn read_ip_mut(&mut self) -> u8 {
+    //     let addr = Self::physical_address(self.regs.get(&Regs::CS).unwrap().value, self.regs.get(&Regs::IP).unwrap().value);
+    //     let val = self.ram[addr as usize];
+    //     self.regs.get_mut(&Regs::IP).unwrap().value += 1;
+    //     self.next_cycles += 1;
+    //     val
+    // }
 
     fn get_reg_16(&self, reg_num: u8) -> Option<u16> {
         Some(self.regs.get(&Regs::translate_reg16(reg_num)?)?.value)
@@ -601,28 +598,28 @@ impl CPU {
     //     }
     // }
 
-    fn get_ptr(arg: DstArg) -> Option<u16> {
-        match arg {
-            DstArg::Ptr(val, _) => Some(val),
-            _ => None
-        }
-    }
+    // fn get_ptr(arg: DstArg) -> Option<u16> {
+    //     match arg {
+    //         DstArg::Ptr(val, _) => Some(val),
+    //         _ => None
+    //     }
+    // }
     
-    fn read_mem_byte(&self, ptr: u16) -> Option<u8> {
-        if ptr > self.ram.len() as u16 {
-            None
-        } else {
-            Some(self.ram[Self::physical_address(self.read_reg(self.instruction.clone().unwrap().segment).unwrap(), ptr) as usize])
-        }
-    }
+    // fn read_mem_byte(&self, ptr: u16) -> Option<u8> {
+    //     if ptr > self.ram.len() as u16 {
+    //         None
+    //     } else {
+    //         Some(self.ram[Self::physical_address(self.read_reg(self.instruction.clone().unwrap().segment).unwrap(), ptr) as usize])
+    //     }
+    // }
 
-    fn read_mem_word(&self, ptr: u16) -> Option<u16> {
-        Some((self.read_mem_byte(ptr)? as u16) | ((self.read_mem_byte(ptr + 1)? as u16) << 8))
-    }
+    // fn read_mem_word(&self, ptr: u16) -> Option<u16> {
+    //     Some((self.read_mem_byte(ptr)? as u16) | ((self.read_mem_byte(ptr + 1)? as u16) << 8))
+    // }
 
-    fn read_mem_dword(&self, ptr: u16) -> Option<u32> {
-        Some((self.read_mem_word(ptr)? as u32) | ((self.read_mem_word(ptr + 2)? as u32) << 16))
-    }
+    // fn read_mem_dword(&self, ptr: u16) -> Option<u32> {
+    //     Some((self.read_mem_word(ptr)? as u32) | ((self.read_mem_word(ptr + 2)? as u32) << 16))
+    // }
 
     fn read_mem_byte_mut(&mut self, ptr: u16) -> Option<u8> {
         if ptr > self.ram.len() as u16 {
@@ -676,38 +673,38 @@ impl CPU {
         Some((self.read_mem_byte_seg(ptr, seg)? as u16) | ((self.read_mem_byte_seg(ptr + 1, seg)? as u16) << 8))
     }
 
-    fn write_mem_byte_seg(&mut self, ptr: u16, seg: Regs, val: u8) -> Result<(), &str> {
-        if ptr > self.ram.len() as u16 {
-            Err("Write out of bounds")
-        } else {
-            let seg_val = self.read_reg(seg).unwrap();
-            self.ram[Self::physical_address(seg_val, ptr) as usize] = (val & 0xFF) as u8;
-            self.next_cycles += 1;
-            Ok(())
-        }
-    }
+    // fn write_mem_byte_seg(&mut self, ptr: u16, seg: Regs, val: u8) -> Result<(), &str> {
+    //     if ptr > self.ram.len() as u16 {
+    //         Err("Write out of bounds")
+    //     } else {
+    //         let seg_val = self.read_reg(seg).unwrap();
+    //         self.ram[Self::physical_address(seg_val, ptr) as usize] = (val & 0xFF) as u8;
+    //         self.next_cycles += 1;
+    //         Ok(())
+    //     }
+    // }
+    //
+    // fn write_mem_word_seg(&mut self, ptr: u16, seg: Regs, val: u16) -> Result<(), &str> {
+    //     self.write_mem_byte_seg(ptr, seg, (val & 0x00FF) as u8).unwrap();
+    //     self.write_mem_byte_seg(ptr, seg, ((ptr & 0xFF00) >> 8) as u8)
+    // }
+    //
+    // fn write_mem_dword_seg(&mut self, ptr: u16, seg: Regs, val: u32) -> Result<(), &str> {
+    //     self.write_mem_word_seg(ptr, seg, (val & 0x0000FFFF) as u16).unwrap();
+    //     self.write_mem_word_seg(ptr + 2, seg, ((val & 0xFFFF0000) >> 16) as u16)
+    // }
 
-    fn write_mem_word_seg(&mut self, ptr: u16, seg: Regs, val: u16) -> Result<(), &str> {
-        self.write_mem_byte_seg(ptr, seg, (val & 0x00FF) as u8).unwrap();
-        self.write_mem_byte_seg(ptr, seg, ((ptr & 0xFF00) >> 8) as u8)
-    }
+    // fn read_ip_word(&self, ip: &mut usize, next_cycles: &mut usize) -> u16 {
+    //     (self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8)
+    // }
 
-    fn write_mem_dword_seg(&mut self, ptr: u16, seg: Regs, val: u32) -> Result<(), &str> {
-        self.write_mem_word_seg(ptr, seg, (val & 0x0000FFFF) as u16).unwrap();
-        self.write_mem_word_seg(ptr + 2, seg, ((val & 0xFFFF0000) >> 16) as u16)
-    }
+    // fn read_ip_dword(&self, ip: &mut usize, next_cycles: &mut usize) -> u32 {
+    //     (self.read_ip_word(ip, next_cycles) as u32) | ((self.read_ip_word(ip, next_cycles) as u32) << 16)
+    // }
 
-    fn read_ip_word(&self, ip: &mut usize, next_cycles: &mut usize) -> u16 {
-        (self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8)
-    }
-
-    fn read_ip_dword(&self, ip: &mut usize, next_cycles: &mut usize) -> u32 {
-        (self.read_ip_word(ip, next_cycles) as u32) | ((self.read_ip_word(ip, next_cycles) as u32) << 16)
-    }
-
-    fn read_ip_word_mut(&mut self) -> u16 {
-        (self.read_ip_mut() as u16) | ((self.read_ip_mut() as u16) << 8)
-    }
+    // fn read_ip_word_mut(&mut self) -> u16 {
+    //     (self.read_ip_mut() as u16) | ((self.read_ip_mut() as u16) << 8)
+    // }
 
     fn write_to_arg(&mut self, arg: DstArg, val_arg: SrcArg) -> Result<(), &str> {
         match arg {
@@ -947,9 +944,9 @@ impl CPU {
         self.set_flag_if(CPUFlags::SIGN, Self::check_src_arg(result, |val| (val & 0x80) != 0, |val| (val & 0x80) != 0));
     }
 
-    fn check_parity(&mut self, result: &SrcArg) {
-        self.set_flag_if(CPUFlags::PARITY, Self::check_src_arg(result, |val| (val & 0x01) != 0, |val| (val & 0x01) != 0));
-    }
+    // fn check_parity(&mut self, result: &SrcArg) {
+    //     self.set_flag_if(CPUFlags::PARITY, Self::check_src_arg(result, |val| (val & 0x01) != 0, |val| (val & 0x01) != 0));
+    // }
 
     fn set_flag_if(&mut self, flag: u16, cond: bool) {
         if cond {
@@ -1015,13 +1012,13 @@ impl CPU {
         }
     }
 
-    fn reg_to_arg(reg: u8, s: u8) -> DstArg {
-        if s == 1 {
-            DstArg::Reg16(reg)
-        } else {
-            DstArg::Reg8(reg)
-        }
-    }
+    // fn reg_to_arg(reg: u8, s: u8) -> DstArg {
+    //     if s == 1 {
+    //         DstArg::Reg16(reg)
+    //     } else {
+    //         DstArg::Reg8(reg)
+    //     }
+    // }
 
     pub fn read_reg(&self, reg: Regs) -> Option<u16> {
         match self.regs.get(&reg) {

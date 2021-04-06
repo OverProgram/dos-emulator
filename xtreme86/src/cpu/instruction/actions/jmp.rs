@@ -35,22 +35,12 @@ pub fn jmp_far(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn jmp_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("JMP"))
-                                                                     }
-
 pub fn cond_jmp(condition: Box<dyn Fn(&CPU) -> bool>) -> Rc<dyn Fn(&mut CPU, Instruction) -> usize> {
     Rc::new(move |this, instruction| {
         if condition(this) {
             this.sub_command(0xE9, instruction.src.clone(), instruction.dst.clone(), 0);
         }
         0
-    })
-}
-
-pub fn cond_jmp_mnemonic(cond_text: String) -> Rc<dyn Fn(u8) -> Option<String>> {
-    Rc::new(move |_| {
-        Some(format!("J{}", cond_text))
     })
 }
 
@@ -62,11 +52,5 @@ pub fn lop(condition: Box<dyn Fn(&CPU) -> bool>) -> Rc<dyn Fn(&mut CPU, Instruct
             this.sub_command(0xE9, None, instruction.dst.clone(), 0);
         }
         0
-    })
-}
-
-pub fn loop_mnemonic(cond_text: String) -> Rc<dyn Fn(u8) -> Option<String>> {
-    Rc::new(move |_| {
-        Some(format!("LOOP{}", cond_text))
     })
 }

@@ -8,28 +8,16 @@ pub fn mov(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn mov_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("MOV"))
-                                                                     }
-
 pub fn cbw(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.regs.get(&Regs::AX).unwrap().get_low();
     comp.regs.get_mut(&Regs::AX).unwrap().value = al as u16;
     0
 }
 
-pub fn cbw_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("CBW"))
-}
-
 pub fn cdw(comp: &mut CPU, _: Instruction) -> usize {
     let ax = comp.regs.get(&Regs::AX).unwrap().value;
     comp.regs.get_mut(&Regs::DX).unwrap().value = if ax & 0x80 == 1 { 0xFF } else { 0x00 };
     0
-}
-
-pub fn cdw_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("CDW"))
 }
 
 pub fn ldw(comp: &mut CPU, instruction: Instruction) -> usize {
@@ -47,23 +35,11 @@ pub fn ldw(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn lds_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("LDS"))
-}
-
-pub fn les_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("LES"))
-}
-
 pub fn lea(comp: &mut CPU, instruction: Instruction) -> usize {
     let new_dst = SrcArg::Word(instruction.src.as_ref().unwrap().to_ptr(comp).unwrap());
     let old_dst = instruction.dst.unwrap();
     comp.write_to_arg(old_dst, new_dst).unwrap();
     0
-}
-
-pub fn lea_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("LEA"))
 }
 
 pub fn lods(comp: &mut CPU, instruction: Instruction) -> usize {
@@ -88,14 +64,6 @@ pub fn lods(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn lods_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("LODS"))
-}
-
 pub fn nop(_: &mut CPU, _: Instruction) -> usize {
                              0
                               }
-
-pub fn nop_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("NOP"))
-                                                                     }

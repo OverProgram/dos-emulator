@@ -2,7 +2,6 @@ use crate::cpu::instruction::opcode::{Opcode, Mnemonic, NumArgs, OpcodeFlags};
 use enumflags2::BitFlags;
 use crate::cpu::{Regs, CPU};
 use crate::cpu::instruction::args::{DstArg, Size};
-use crate::cpu::instruction::args::DstArg::Reg;
 use std::fmt::Formatter;
 
 pub mod opcode;

@@ -1,12 +1,17 @@
 extern crate enumflags2;
 
+#[cfg(test)]
 use std::fs::File;
+#[cfg(test)]
 use std::fs;
+#[cfg(test)]
 use std::io::Read;
+#[cfg(test)]
 use std::path::PathBuf;
 
 pub mod cpu;
 
+#[cfg(test)]
 fn new_cpu_from_file(filename: &str) -> cpu::CPU {
     let mut computer = cpu::CPU::new(0x7FFFFF);
     computer.set_reg(cpu::Regs::SS, 0x003F);
@@ -28,6 +33,7 @@ fn new_cpu_from_file(filename: &str) -> cpu::CPU {
     computer
 }
 
+#[cfg(test)]
 fn new_cpu_vec(code: Vec<u8>) -> cpu::CPU {
     let mut computer = cpu::CPU::new(code.len());
     computer.load(code, 0);
@@ -166,8 +172,9 @@ mod test_alu {
         assert_eq!(computer.read_reg(Regs::DX).unwrap(), 0x0055);
     }
 
+    #[test]
     fn test_misc() {
-        let mut computer = new_cpu_from_file("tests/objs/alu.out");
+        let mut computer = new_cpu_from_file("tests/obj/alu.out");
         computer.run_to_nop(0);
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x08);
     }

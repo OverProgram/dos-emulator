@@ -53,12 +53,12 @@ pub fn alu_dispatch_two_args(comp: &mut CPU, instruction: Instruction) -> usize 
 
 pub fn alu_dispatch_two_args_mnemonic(reg_bits: u8) -> String {
     String::from(match reg_bits {
-        0b000 => "ADD",
-        0b001 => "OR",
-        0b010 => "ADC",
-        0b100 => "AND",
-        0b101 => "SUB",
-        0b110 => "XOR",
+        0b000 => "add",
+        0b001 => "or",
+        0b010 => "adc",
+        0b100 => "and",
+        0b101 => "sub",
+        0b110 => "xor",
         _ => panic!("invalid reg_bits value")
     })
 }
@@ -78,11 +78,11 @@ pub fn alu_dispatch_one_arg(comp: &mut CPU, instruction: Instruction) -> usize {
 
 pub fn alu_dispatch_one_arg_mnemonic(reg_bits: u8) -> String {
     String::from(match reg_bits {
-        0b000 => "INC",
-        0b001 => "DEC",
-        0b010 | 0b011 => "CALL",
-        0b100 | 0b101 => "JMP",
-        0b110 => "PUSH",
+        0b000 => "inc",
+        0b001 => "dec",
+        0b010 | 0b011 => "call",
+        0b100 | 0b101 => "jmp",
+        0b110 => "push",
         _ => panic!("invalid reg_bits value")
     })
 }
@@ -101,12 +101,12 @@ pub fn mul_dispatch(comp: &mut CPU, instruction: Instruction) -> usize {
 
 pub fn mul_dispatch_mnemonic(reg_bits: u8) -> String {
     String::from(match reg_bits {
-        0b010 => "NOT",
-        0b011 => "NEG",
-        0b100 => "MUL",
-        0b101 => "IMUL",
-        0b110 => "DIV",
-        0b111 => "IDIV",
+        0b010 => "not",
+        0b011 => "neg",
+        0b100 => "mul",
+        0b101 => "imul",
+        0b110 => "div",
+        0b111 => "idiv",
         _ => panic!("invalid reg_bits value")
     })
 }
@@ -119,10 +119,6 @@ pub fn add(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.write_to_arg(instruction.dst.clone().unwrap(), sum).unwrap();
     0
 }
-
-pub fn add_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("ADD"))
-                                                                     }
 
 pub fn adc(comp: &mut CPU, instruction: Instruction) -> usize {
     let cf = (comp.read_reg(Regs::FLAGS).unwrap() & CPUFlags::CARRY) >> 0x01;
@@ -148,10 +144,6 @@ pub fn adc(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn adc_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("ADC"))
-}
-
 pub fn sub(comp: &mut CPU, instruction: Instruction) -> usize {
     let src = instruction.src.clone().unwrap().to_src_arg(comp).unwrap();
     comp.check_carry_sub(src);
@@ -161,20 +153,12 @@ pub fn sub(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn sub_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("SUB"))
-                                                                     }
-
 pub fn and(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_2_args(|src, dst| dst & src, |src, dst| dst & src);
     comp.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
     comp.write_to_arg(instruction.dst.clone().unwrap(), result).unwrap();
     0
 }
-
-pub fn and_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("AND"))
-                                                                     }
 
 pub fn or(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_2_args(|src, dst| dst | src, |src, dst| dst | src);
@@ -183,20 +167,12 @@ pub fn or(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn or_mnemonic(_: u8) -> Option<String> {
-                                          Some(String::from("OR"))
-                                                                   }
-
 pub fn xor(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_2_args(|src, dst| dst ^ src, |src, dst| dst ^ src);
     comp.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
     comp.write_to_arg(instruction.dst.clone().unwrap(), result).unwrap();
     0
 }
-
-pub fn xor_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("XOR"))
-                                                                     }
 
 pub fn not(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_1_arg(|dst| !dst, |dst| !dst);
@@ -228,20 +204,12 @@ pub fn inc(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn inc_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("INC"))
-                                                                     }
-
 pub fn dec(comp: &mut CPU, instruction: Instruction) -> usize {
     let sum = comp.operation_1_arg(|dst| sub_with_carry_8_bit(dst, 1), |dst| sub_with_carry_16_bit(dst, 1));
     comp.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
     comp.write_to_arg(instruction.dst.clone().unwrap(), sum).unwrap();
     0
 }
-
-pub fn dec_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("DEC"))
-                                                                     }
 
 fn set_overflow(comp: &mut CPU, result_high: u16) {
     if result_high == 0 {
@@ -355,7 +323,7 @@ pub fn idiv(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn aaa(comp: &mut CPU, instruction: Instruction) -> usize {
+pub fn aaa(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.get_reg_8(0).unwrap();
     if al & 0x0F > 9 || comp.regs[&Regs::FLAGS].value & CPUFlags::AUX_CARRY > 0 {
         let ax = comp.regs.get_mut(&Regs::AX).unwrap();
@@ -369,10 +337,6 @@ pub fn aaa(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn aaa_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("AAA"))
-                                                                     }
-
 pub fn aad(comp: &mut CPU, instruction: Instruction) -> usize {
     if let Some(DstArg::Imm8(base)) = instruction.dst {
         let ax = comp.regs.get_mut(&Regs::AX).unwrap();
@@ -385,11 +349,7 @@ pub fn aad(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn aad_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("AAD"))
-}
-
-pub fn aas(comp: &mut CPU, instruction: Instruction) -> usize {
+pub fn aas(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.get_reg_8(0).unwrap();
 
     if (al & 0xF) > 9 || comp.check_flag(CPUFlags::AUX_CARRY) {
@@ -406,11 +366,7 @@ pub fn aas(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn aas_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("AAS"))
-}
-
-pub fn daa(comp: &mut CPU, instruction: Instruction) -> usize {
+pub fn daa(comp: &mut CPU, _: Instruction) -> usize {
     let old_al = comp.regs.get(&Regs::AX).unwrap().get_low();
     let old_cf = comp.check_flag(CPUFlags::CARRY);
     comp.clear_flag(CPUFlags::CARRY);
@@ -430,8 +386,4 @@ pub fn daa(comp: &mut CPU, instruction: Instruction) -> usize {
         comp.clear_flag(CPUFlags::CARRY);
     }
     0
-}
-
-pub fn daa_mnemonic(_: u8)-> Option<String> {
-    Some(String::from("DAA"))
 }

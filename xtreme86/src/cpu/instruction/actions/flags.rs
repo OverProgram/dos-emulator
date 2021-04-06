@@ -8,17 +8,9 @@ pub fn clc(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-pub fn clc_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("CLC"))
-}
-
 pub fn cld(comp: &mut CPU, _: Instruction) -> usize {
     comp.clear_flag(CPUFlags::DIRECTION);
     0
-}
-
-pub fn cld_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("CLD"))
 }
 
 pub fn cli(comp: &mut CPU, _: Instruction) -> usize {
@@ -26,17 +18,9 @@ pub fn cli(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-pub fn cli_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("CLI"))
-}
-
 pub fn cmc(comp: &mut CPU, _: Instruction) -> usize {
     comp.flip_flag(CPUFlags::CARRY);
     0
-}
-
-pub fn cmc_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("CMC"))
 }
 
 pub fn cmp(comp: &mut CPU, instruction: Instruction) -> usize {
@@ -45,10 +29,6 @@ pub fn cmp(comp: &mut CPU, instruction: Instruction) -> usize {
     let dif = comp.operation_2_args(|src, dst| sub_with_carry_8_bit(dst, src), |src, dst| sub_with_carry_16_bit(dst, src));
     comp.check_flags_in_result(&dif, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
     0
-}
-
-pub fn cmp_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("CMP"))
 }
 
 pub fn cmps(comp: &mut CPU, instruction: Instruction) -> usize {
@@ -75,16 +55,8 @@ pub fn cmps(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn cmps_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("CMPS"))
-}
-
 pub fn lahf(comp: &mut CPU, _: Instruction) -> usize {
     let new_ah = comp.regs.get(&Regs::FLAGS).unwrap().get_low();
     comp.regs.get_mut(&Regs::AX).unwrap().set_low(new_ah);
     0
-}
-
-pub fn lahf_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("LAHF"))
 }

@@ -8,10 +8,6 @@ pub fn int_req(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn int_mnemonic(_: u8) -> Option<String> {
-                                           Some(String::from("INT"))
-                                                                     }
-
 fn get_int_num(comp: &mut CPU, instruction: Instruction) -> u8 {
     match instruction.dst.clone().unwrap().to_src_arg(comp).unwrap() {
         SrcArg::Byte(val) => Some(val),
@@ -38,16 +34,12 @@ pub fn int(comp: &mut CPU) -> usize {
     0
 }
 
-pub fn iret(comp: &mut CPU, instruction: Instruction) -> usize {
+pub fn iret(comp: &mut CPU, _: Instruction) -> usize {
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::IP)), 0b110);
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::CS)), 0b110);
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::FLAGS)), 0b110);
     0
 }
-
-pub fn iret_mnemonic(_: u8) -> Option<String> {
-                                            Some(String::from("IRET"))
-                                                                       }
 
 pub fn bound(comp: &mut CPU, instruction: Instruction) -> usize {
     if let Some(SrcArg::DWord(bounds)) = instruction.src.clone().unwrap().to_src_arg(comp) {
@@ -65,8 +57,4 @@ pub fn bound(comp: &mut CPU, instruction: Instruction) -> usize {
         }
     }
     0
-}
-
-pub fn bound_mnemonic(_: u8) -> Option<String> {
-    Some(String::from("BOUND"))
 }
