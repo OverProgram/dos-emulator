@@ -168,7 +168,7 @@ impl Regs {
     }
 
     fn translate_reg8(num: u8) -> Option<(Self, WordPart)> {
-        Some((Self::translate_reg16(num % 4)?, if num % 2 == 0 { WordPart::Low } else { WordPart::High }))
+        Some((Self::translate_reg16(num % 4)?, if num / 4 == 0 { WordPart::Low } else { WordPart::High }))
     }
 }
 
@@ -903,6 +903,7 @@ impl CPU {
             SrcArg::Word(src) => {
                 if let SrcArg::Word(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     self.check_carry_16_bit(src, dst);
+                    self.check_aux_carry_result(src, dst);
                 }
             },
             SrcArg::Byte(src) => {
@@ -917,9 +918,9 @@ impl CPU {
     }
 
     fn check_flags_in_result(&mut self, result: &SrcArg, flags: u16) {
-        if Self::check_flag_in_reg(flags, CPUFlags::AUX_CARRY) {
-            self.check_aux_carry(result);
-        }
+        // if Self::check_flag_in_reg(flags, CPUFlags::AUX_CARRY) {
+        //     self.check_aux_carry(result);
+        // }
         if Self::check_flag_in_reg(flags, CPUFlags::ZERO) {
             self.check_zero(result);
         }
@@ -936,9 +937,9 @@ impl CPU {
         self.set_flag_if(CPUFlags::ZERO, Self::check_src_arg(result, |val| val == 0, |val| val == 0));
     }
 
-    fn check_aux_carry(&mut self, result: &SrcArg) {
-        self.set_flag_if(CPUFlags::AUX_CARRY, Self::check_src_arg(result, |val| (val & 0xF0) != 0, |val| (val & 0xF0) != 0));
-    }
+    // fn check_aux_carry(&mut self, result: &SrcArg) {
+    //     self.set_flag_if(CPUFlags::AUX_CARRY, Self::check_src_arg(result, |val| (val & 0xF0) != 0, |val| (val & 0xF0) != 0));
+    // }
 
     fn check_sign(&mut self, result: &SrcArg) {
         self.set_flag_if(CPUFlags::SIGN, Self::check_src_arg(result, |val| (val & 0x80) != 0, |val| (val & 0x80) != 0));
@@ -1009,6 +1010,15 @@ impl CPU {
             self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::CARRY;
         } else {
             self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !CPUFlags::CARRY;
+        }
+    }
+
+    fn check_aux_carry_result(&mut self, arg1: u16, arg2: u16) {
+        let result = (arg1 & 0x00FF) + arg2;
+        if result & 0xFF00 > 0 {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value |= CPUFlags::AUX_CARRY;
+        } else {
+            self.regs.get_mut(&Regs::FLAGS).unwrap().value &= !CPUFlags::AUX_CARRY;
         }
     }
 

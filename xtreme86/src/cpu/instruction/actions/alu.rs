@@ -115,7 +115,7 @@ pub fn add(comp: &mut CPU, instruction: Instruction) -> usize {
     let src = instruction.src.clone().unwrap().to_src_arg(comp).unwrap();
     comp.check_carry_add(src);
     let sum = comp.operation_2_args(|src, dst| add_with_carry_8_bit(dst, src), |src, dst| add_with_carry_16_bit(dst, src));
-    comp.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
+    comp.check_flags_in_result(&sum, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
     comp.write_to_arg(instruction.dst.clone().unwrap(), sum).unwrap();
     0
 }
@@ -325,7 +325,7 @@ pub fn idiv(comp: &mut CPU, instruction: Instruction) -> usize {
 
 pub fn aaa(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.get_reg_8(0).unwrap();
-    if al & 0x0F > 9 || comp.regs[&Regs::FLAGS].value & CPUFlags::AUX_CARRY > 0 {
+    if al & 0x0F > 9 || comp.check_flag(CPUFlags::AUX_CARRY) {
         let ax = comp.regs.get_mut(&Regs::AX).unwrap();
         let (ax_high, ax_low) = (ax.get_high(), ax.get_low());
         ax.set_high(ax_high + 1);
@@ -334,6 +334,8 @@ pub fn aaa(comp: &mut CPU, _: Instruction) -> usize {
     } else {
         comp.regs.get_mut(&Regs::FLAGS).unwrap().value &= !(CPUFlags::AUX_CARRY | CPUFlags::CARRY);
     }
+    let new_al = comp.get_reg_8(0).unwrap() & 0x0F;
+    comp.regs.get_mut(&Regs::AX).unwrap().set_low(new_al);
     0
 }
 

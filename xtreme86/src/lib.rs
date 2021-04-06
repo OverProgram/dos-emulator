@@ -176,7 +176,13 @@ mod test_alu {
     fn test_misc() {
         let mut computer = new_cpu_from_file("tests/obj/alu.out");
         computer.run_to_nop(0);
-        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x08);
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x0000);
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap() & 0xFF, 9);
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::BX).unwrap() & 0xFF, 9);
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x02);
     }
 }
 

@@ -17,10 +17,10 @@ impl Reg {
     }
 
     pub fn set_low(&mut self, val: u8) {
-        self.value = (self.value & 0xFF00) | ((val as u16) << 8);
+        self.value = (self.value & 0xFF00) | (val as u16);
     }
 
     pub fn set_high(&mut self, val: u8) {
-        self.value = (self.value & 0x00FF) | (val as u16);
+        self.value = (self.value & 0x00FF) | ((val as u16) << 8);
     }
 }
