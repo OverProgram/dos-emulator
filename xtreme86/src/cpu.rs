@@ -7,6 +7,7 @@ use enumflags2::{BitFlags, bitflags};
 use std::fmt::{Debug, Formatter};
 use std::fmt;
 use crate::cpu::instruction::actions::{int, alu};
+use crate::cpu::instruction::data;
 
 #[bitflags]
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -47,59 +48,59 @@ mod exceptions {
     pub const IVT_TOO_SMALL: u8 = 0x08;
 }
 
-#[derive(Clone, Copy, Debug)]
-enum NumArgs {
-    Zero,
-    One,
-    Two
-}
-
-#[derive(Clone, Copy, Debug)]
-enum DstArg {
-    Reg8(u8),
-    Reg16(u8),
-    Imm8(u8),
-    Imm16(u16),
-    Imm32(u32),
-    Ptr32(u16),
-    Ptr16(u16),
-    Ptr8(u16),
-    Reg(Regs)
-}
-
-impl DstArg {
-    fn to_text(&self) -> String {
-        match self {
-            DstArg::Reg8(id) => Regs::id_8_bit_to_text(*id),
-            DstArg::Reg16(id) => Regs::translate_reg16(*id).unwrap().to_text(),
-            DstArg::Imm8(val) => val.to_string(),
-            DstArg::Imm16(val) => val.to_string(),
-            DstArg::Imm32(val) => val.to_string(),
-            DstArg::Ptr32(val) => format!("[DWORD PTR {}]", val),
-            DstArg::Ptr16(val) => format!("[WORD PTR {}]", val),
-            DstArg::Ptr8(val) => format!("[BYTE PTR {}]", val),
-            DstArg::Reg(reg) => reg.to_text(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-enum SrcArg {
-    Byte(u8),
-    Word(u16),
-    DWord(u32),
-}
-
-#[derive(Clone, Copy, Debug)]
-enum Placeholder {
-    Reg8(u8),
-    Reg16(u8),
-    Reg(u8),
-    Byte(u8),
-    Word(u16),
-    Imm,
-    Ptr
-}
+// #[derive(Clone, Copy, Debug)]
+// enum NumArgs {
+//     Zero,
+//     One,
+//     Two
+// }
+//
+// #[derive(Clone, Copy, Debug)]
+// enum DstArg {
+//     Reg8(u8),
+//     Reg16(u8),
+//     Imm8(u8),
+//     Imm16(u16),
+//     Imm32(u32),
+//     Ptr32(u16),
+//     Ptr16(u16),
+//     Ptr8(u16),
+//     Reg(Regs)
+// }
+//
+// impl DstArg {
+//     fn to_text(&self) -> String {
+//         match self {
+//             DstArg::Reg8(id) => Regs::id_8_bit_to_text(*id),
+//             DstArg::Reg16(id) => Regs::translate_reg16(*id).unwrap().to_text(),
+//             DstArg::Imm8(val) => val.to_string(),
+//             DstArg::Imm16(val) => val.to_string(),
+//             DstArg::Imm32(val) => val.to_string(),
+//             DstArg::Ptr32(val) => format!("[DWORD PTR {}]", val),
+//             DstArg::Ptr16(val) => format!("[WORD PTR {}]", val),
+//             DstArg::Ptr8(val) => format!("[BYTE PTR {}]", val),
+//             DstArg::Reg(reg) => reg.to_text(),
+//         }
+//     }
+// }
+//
+// #[derive(Clone, Copy, Debug)]
+// enum SrcArg {
+//     Byte(u8),
+//     Word(u16),
+//     DWord(u32),
+// }
+//
+// #[derive(Clone, Copy, Debug)]
+// enum Placeholder {
+//     Reg8(u8),
+//     Reg16(u8),
+//     Reg(u8),
+//     Byte(u8),
+//     Word(u16),
+//     Imm,
+//     Ptr
+// }
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
 pub enum Regs {
@@ -178,58 +179,54 @@ enum WordPart {
     High
 }
 
-#[derive(Clone)]
-struct Opcode {
-    instruction: Rc<dyn Fn(&mut CPU) -> usize>,
-    num_args: NumArgs,
-    cycles: usize,
-    shorthand: Option<(Placeholder, Option<Placeholder>)>,
-    flags: BitFlags<OpcodeFlags>,
-    segment: Regs,
-    mnemonic: Rc<dyn Fn(u8) -> Option<String>>
-}
-
-impl Opcode {
-    fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, mnemonic: Rc<dyn Fn(u8) -> Option<String>>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, segment: Regs, flags: BitFlags<OpcodeFlags>) -> Self {
-        Self {
-            instruction,
-            num_args,
-            cycles,
-            shorthand,
-            flags,
-            segment,
-            mnemonic
-        }
-    }
-
-    fn has_flag(&self, flag: BitFlags<OpcodeFlags>) -> bool {
-        self.flags.contains(flag)
-    }
-}
-
-impl fmt::Debug for Opcode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Opcode")
-            .field("num_args", &self.num_args)
-            .field("cycles", &self.cycles)
-            .field("shorthand", &self.shorthand)
-            .field("flags", &self.flags)
-            .field("segment", &self.segment)
-            .finish()
-    }
-}
+// #[derive(Clone)]
+// struct Opcode {
+//     instruction: Rc<dyn Fn(&mut CPU) -> usize>,
+//     num_args: NumArgs,
+//     cycles: usize,
+//     shorthand: Option<(Placeholder, Option<Placeholder>)>,
+//     flags: BitFlags<OpcodeFlags>,
+//     segment: Regs,
+//     mnemonic: Rc<dyn Fn(u8) -> Option<String>>
+// }
+//
+// impl Opcode {
+//     fn new(instruction: Rc<dyn Fn(&mut CPU) -> usize>, mnemonic: Rc<dyn Fn(u8) -> Option<String>>, num_args: NumArgs, cycles: usize, shorthand: Option<(Placeholder, Option<Placeholder>)>, segment: Regs, flags: BitFlags<OpcodeFlags>) -> Self {
+//         Self {
+//             instruction,
+//             num_args,
+//             cycles,
+//             shorthand,
+//             flags,
+//             segment,
+//             mnemonic
+//         }
+//     }
+//
+//     fn has_flag(&self, flag: BitFlags<OpcodeFlags>) -> bool {
+//         self.flags.contains(flag)
+//     }
+// }
+//
+// impl fmt::Debug for Opcode {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+//         f.debug_struct("Opcode")
+//             .field("num_args", &self.num_args)
+//             .field("cycles", &self.cycles)
+//             .field("shorthand", &self.shorthand)
+//             .field("flags", &self.flags)
+//             .field("segment", &self.segment)
+//             .finish()
+//     }
+// }
 
 #[derive(Debug)]
 pub struct CPU {
     ram: Vec<u8>,
     regs: HashMap<Regs, reg::Reg>,
-    opcodes: HashMap<u8, Opcode>,
-    instruction: Option<Opcode>,
-    src: Option<SrcArg>,
-    dst: Option<DstArg>,
-    seg: Regs,
+    opcodes: [Option<instruction::opcode::Opcode>; 256],
+    instruction: Option<instruction::Instruction>,
     next_cycles: usize,
-    reg_bits: u8,
     irq: Option<u8>,
     opcode_address: (u16, u16),
     src_ptr: Option<u16>,
@@ -257,8 +254,8 @@ impl CPU {
         regs.insert(Regs::IP, reg::Reg::new());
         regs.insert(Regs::FLAGS, reg::Reg::new());
 
-        // Define opcodes
-        let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
+        // // Define opcodes
+        // let mut opcodes: HashMap<u8, Opcode> = HashMap::new();
         //NOP
         // opcodes.insert(0x90, Opcode::new(Rc::new(mem::nop), Rc::new(mem::nop_mnemonic), NumArgs::Zero, 1, None, Regs::DS, OpcodeFlags::Nop.into()));
         // // Move opcodes
@@ -350,13 +347,9 @@ impl CPU {
         Self {
             ram,
             regs,
-            opcodes,
+            opcodes: instruction::opcode::Opcode::get_opcode_data(),
             instruction: None,
-            src: None,
-            dst: None,
-            seg: Regs::DS,
             next_cycles: 0,
-            reg_bits: 0,
             irq: None,
             opcode_address: (0, 0),
             src_ptr: None
@@ -377,168 +370,157 @@ impl CPU {
         } else {
             let opcode_address =  (self.regs[&Regs::CS].value, self.regs[&Regs::IP].value);
             self.opcode_address = opcode_address;
-            let (instruction, dst, src, seg, next_cycles, ip_offset, reg_bits) = self.decode_instruction(self.regs.get(&Regs::IP).unwrap().value as usize);
-            self.instruction = instruction;
-            self.dst = dst;
-            self.src_ptr = match src {
-                Some(arg) => Self::get_ptr(arg),
-                None => None
-            };
-            self.src = match src {
-                Some(arg) => self.get_src_arg_mut(arg),
-                None => None
-            };
-            self.reg_bits = reg_bits;
-            self.next_cycles = next_cycles;
-            self.seg = seg;
-            self.regs.get_mut(&Regs::IP).unwrap().value = ip_offset as u16;
+            let physical_address = Self::physical_address(opcode_address.0, opcode_address.1) as usize;
+            self.instruction.replace(instruction::InstructionDecoder::new(self.opcodes.clone(), &self.ram[physical_address..]).get());
+            self.next_cycles += self.instruction.clone().unwrap().next_cycles;
+            self.regs.get_mut(&Regs::IP).unwrap().value = instruction.length as u16;
         }
     }
 
-    fn decode_instruction(&self, loc: usize) -> (Option<Opcode>, Option<DstArg>, Option<DstArg>, Regs, usize, u16, u8) {
-        let mut next_cycles = 0;
-        let mut ip_tmp = loc;
-        let code = self.read_ip(&mut ip_tmp, &mut next_cycles);
-        let opcode = self.get_opcode(&code).clone();
-        next_cycles += opcode.cycles;
-        let immediate = opcode.has_flag(OpcodeFlags::Immediate.into());
-        let size_mismatch = opcode.has_flag(OpcodeFlags::SizeMismatch.into());
-        let force_dword = opcode.has_flag(OpcodeFlags::ForceDWord.into());
-        let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
-        let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
-        let force_direction = opcode.has_flag(OpcodeFlags::ForceDirection.into());
-        let d = (code & 0x02) >> 1;
-        let mut s = if force_dword { 2 } else { (code & 0x01) >> 0 };
-        let num_args = opcode.num_args;
-        let shorthand = opcode.shorthand.clone();
-        let seg = opcode.segment;
-        let mut src: Option<DstArg> = None;
-        let mut dst: Option<DstArg> = None;
-        let mut reg_bits = 0;
+    // fn decode_instruction(&self, loc: usize) -> (Option<Opcode>, Option<DstArg>, Option<DstArg>, Regs, usize, u16, u8) {
+    //     let mut next_cycles = 0;
+    //     let mut ip_tmp = loc;
+    //     let code = self.read_ip(&mut ip_tmp, &mut next_cycles);
+    //     let opcode = self.get_opcode(&code).clone();
+    //     next_cycles += opcode.cycles;
+    //     let immediate = opcode.has_flag(OpcodeFlags::Immediate.into());
+    //     let size_mismatch = opcode.has_flag(OpcodeFlags::SizeMismatch.into());
+    //     let force_dword = opcode.has_flag(OpcodeFlags::ForceDWord.into());
+    //     let force_word = opcode.has_flag(OpcodeFlags::ForceWord.into());
+    //     let force_byte = opcode.has_flag(OpcodeFlags::ForceByte.into());
+    //     let force_direction = opcode.has_flag(OpcodeFlags::ForceDirection.into());
+    //     let d = (code & 0x02) >> 1;
+    //     let mut s = if force_dword { 2 } else { (code & 0x01) >> 0 };
+    //     let num_args = opcode.num_args;
+    //     let shorthand = opcode.shorthand.clone();
+    //     let seg = opcode.segment;
+    //     let mut src: Option<DstArg> = None;
+    //     let mut dst: Option<DstArg> = None;
+    //     let mut reg_bits = 0;
+    //
+    //     if let Some((arg1, arg2)) = opcode.shorthand.clone() {
+    //         if let (Placeholder::Imm, Some(Placeholder::Imm)) = (arg1, arg2) {
+    //             if size_mismatch {
+    //                 dst = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
+    //                 src = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
+    //             } else {
+    //                 if s == 0 {
+    //                     dst = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
+    //                     src = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
+    //                 } else if s == 2 {
+    //                     dst = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
+    //                     src = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
+    //                 }
+    //             }
+    //         } else {
+    //             let arg1_translated = Some(self.translate_placeholder(arg1, s, &mut ip_tmp, &mut next_cycles));
+    //             s = match arg1_translated.clone().unwrap() {
+    //                 DstArg::Reg8(_) => 0,
+    //                 DstArg::Reg16(_) => 1,
+    //                 _ => s
+    //             };
+    //             let mut arg2_translated = None;
+    //             if let Some(arg) = arg2 {
+    //                 arg2_translated = Some(self.translate_placeholder(arg, s, &mut ip_tmp, &mut next_cycles));
+    //             }
+    //             let one_arg = if let NumArgs::Two = num_args { false } else { true };
+    //             if (d == 1 && !immediate && !one_arg) || force_direction {
+    //                 src = arg1_translated;
+    //                 dst = arg2_translated;
+    //             } else {
+    //                 src = arg2_translated;
+    //                 dst = arg1_translated;
+    //             }
+    //         }
+    //     }
+    //
+    //     match num_args {
+    //         NumArgs::Two => {
+    //             if let None = shorthand {
+    //                 let mod_reg_rm = self.read_ip(&mut ip_tmp, &mut next_cycles);
+    //                 let rm = (mod_reg_rm & 0x07) >> 0;
+    //                 let reg = (mod_reg_rm & 0x38) >> 3;
+    //                 let mod_bits = (mod_reg_rm & 0xC0) >> 6;
+    //                 let arg2 = {
+    //                     if let None = self.src {
+    //                         self.translate_mod_rm(mod_bits, rm, s, &mut ip_tmp, &mut next_cycles)
+    //                     } else {
+    //                         None
+    //                     }
+    //                 };
+    //                 let arg1 = if immediate {
+    //                     Some(
+    //                         if force_dword {
+    //                             DstArg::Imm32(self.read_ip_dword(&mut ip_tmp, &mut next_cycles))
+    //                         } else if ((s == 1 && !size_mismatch) || force_word) && !force_byte {
+    //                             DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles))
+    //                         } else {
+    //                             DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles))
+    //                         }
+    //                     )
+    //                 } else if force_dword {
+    //                     Some(DstArg::Ptr32(self.read_ip_word(&mut ip_tmp, &mut next_cycles)))
+    //                 } else {
+    //                     Some(Self::reg_to_arg(reg, s))
+    //                 };
+    //
+    //                 if (d == 0 || immediate || force_dword) && !force_direction {
+    //                     if let None = self.src {
+    //                         src = arg1;
+    //                     }
+    //                     if let None = self.dst {
+    //                         dst = arg2;
+    //                     }
+    //                 } else {
+    //                     if let None = self.src {
+    //                         src = arg2;
+    //                     }
+    //                     if let None = self.dst {
+    //                         dst = arg1;
+    //                     }
+    //                 }
+    //
+    //                 reg_bits = reg;
+    //             }
+    //         },
+    //         NumArgs::One => {
+    //             if let None = dst {
+    //                 if immediate {
+    //                     dst = Some(
+    //                     if force_dword {
+    //                         DstArg::Imm32(self.read_ip_dword(&mut ip_tmp, &mut next_cycles))
+    //                     } else if ((d == 0 && !size_mismatch) || force_word) && !force_byte {
+    //                         DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles))
+    //                     } else {
+    //                         DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles))
+    //                     })
+    //                 } else {
+    //                     let mod_reg_rm = self.read_ip(&mut ip_tmp, &mut next_cycles);
+    //                     let rm = (mod_reg_rm & 0x07) >> 0;
+    //                     let mod_bits = (mod_reg_rm & 0xC0) >> 6;
+    //                     let arg = self.translate_mod_rm(mod_bits, rm, s, &mut ip_tmp, &mut next_cycles);
+    //                     dst = arg;
+    //                     reg_bits = (mod_reg_rm & 0x38) >> 3;
+    //                 }
+    //             }
+    //         },
+    //         NumArgs::Zero => ()
+    //     }
+    //     (Some(opcode), dst, src, seg, next_cycles, ip_tmp as u16, reg_bits)
+    // }
 
-        if let Some((arg1, arg2)) = opcode.shorthand.clone() {
-            if let (Placeholder::Imm, Some(Placeholder::Imm)) = (arg1, arg2) {
-                if size_mismatch {
-                    dst = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
-                    src = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
-                } else {
-                    if s == 0 {
-                        dst = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
-                        src = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
-                    } else if s == 2 {
-                        dst = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
-                        src = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
-                    }
-                }
-            } else {
-                let arg1_translated = Some(self.translate_placeholder(arg1, s, &mut ip_tmp, &mut next_cycles));
-                s = match arg1_translated.clone().unwrap() {
-                    DstArg::Reg8(_) => 0,
-                    DstArg::Reg16(_) => 1,
-                    _ => s
-                };
-                let mut arg2_translated = None;
-                if let Some(arg) = arg2 {
-                    arg2_translated = Some(self.translate_placeholder(arg, s, &mut ip_tmp, &mut next_cycles));
-                }
-                let one_arg = if let NumArgs::Two = num_args { false } else { true };
-                if (d == 1 && !immediate && !one_arg) || force_direction {
-                    src = arg1_translated;
-                    dst = arg2_translated;
-                } else {
-                    src = arg2_translated;
-                    dst = arg1_translated;
-                }
-            }
-        }
-
-        match num_args {
-            NumArgs::Two => {
-                if let None = shorthand {
-                    let mod_reg_rm = self.read_ip(&mut ip_tmp, &mut next_cycles);
-                    let rm = (mod_reg_rm & 0x07) >> 0;
-                    let reg = (mod_reg_rm & 0x38) >> 3;
-                    let mod_bits = (mod_reg_rm & 0xC0) >> 6;
-                    let arg2 = {
-                        if let None = self.src {
-                            self.translate_mod_rm(mod_bits, rm, s, &mut ip_tmp, &mut next_cycles)
-                        } else {
-                            None
-                        }
-                    };
-                    let arg1 = if immediate {
-                        Some(
-                            if force_dword {
-                                DstArg::Imm32(self.read_ip_dword(&mut ip_tmp, &mut next_cycles))
-                            } else if ((s == 1 && !size_mismatch) || force_word) && !force_byte {
-                                DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles))
-                            } else {
-                                DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles))
-                            }
-                        )
-                    } else if force_dword {
-                        Some(DstArg::Ptr32(self.read_ip_word(&mut ip_tmp, &mut next_cycles)))
-                    } else {
-                        Some(Self::reg_to_arg(reg, s))
-                    };
-
-                    if (d == 0 || immediate || force_dword) && !force_direction {
-                        if let None = self.src {
-                            src = arg1;
-                        }
-                        if let None = self.dst {
-                            dst = arg2;
-                        }
-                    } else {
-                        if let None = self.src {
-                            src = arg2;
-                        }
-                        if let None = self.dst {
-                            dst = arg1;
-                        }
-                    }
-
-                    reg_bits = reg;
-                }
-            },
-            NumArgs::One => {
-                if let None = dst {
-                    if immediate {
-                        dst = Some(
-                        if force_dword {
-                            DstArg::Imm32(self.read_ip_dword(&mut ip_tmp, &mut next_cycles))
-                        } else if ((d == 0 && !size_mismatch) || force_word) && !force_byte {
-                            DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles))
-                        } else {
-                            DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles))
-                        })
-                    } else {
-                        let mod_reg_rm = self.read_ip(&mut ip_tmp, &mut next_cycles);
-                        let rm = (mod_reg_rm & 0x07) >> 0;
-                        let mod_bits = (mod_reg_rm & 0xC0) >> 6;
-                        let arg = self.translate_mod_rm(mod_bits, rm, s, &mut ip_tmp, &mut next_cycles);
-                        dst = arg;
-                        reg_bits = (mod_reg_rm & 0x38) >> 3;
-                    }
-                }
-            },
-            NumArgs::Zero => ()
-        }
-        (Some(opcode), dst, src, seg, next_cycles, ip_tmp as u16, reg_bits)
-    }
-
-    fn get_opcode(&self, code: &u8) -> &Opcode {
-        match self.opcodes.get(&code) {
-            Some(opcode) => opcode,
-            None => match self.opcodes.get(&(code & 0xFE)) {
-                Some(opcode) => opcode,
-                None => match self.opcodes.get(&(code & 0xFD)) {
-                    Some(val) => val,
-                    None => self.opcodes.get(&(code & 0xFC)).unwrap()
-                }
-            }
-        }
-    }
+    // fn get_opcode(&self, code: &u8) -> &Opcode {
+    //     match self.opcodes.get(&code) {
+    //         Some(opcode) => opcode,
+    //         None => match self.opcodes.get(&(code & 0xFE)) {
+    //             Some(opcode) => opcode,
+    //             None => match self.opcodes.get(&(code & 0xFD)) {
+    //                 Some(val) => val,
+    //                 None => self.opcodes.get(&(code & 0xFC)).unwrap()
+    //             }
+    //         }
+    //     }
+    // }
 
     fn except(&mut self, code: u8) -> Result<(), String> {
         match code {
@@ -591,33 +573,33 @@ impl CPU {
         }
     }
 
-    fn get_src_arg(&self, arg: DstArg, next_cycles: &mut usize) -> Option<SrcArg> {
-        match arg {
-            DstArg::Reg8(reg) => Some(SrcArg::Byte(self.get_reg_8(reg)?)),
-            DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
-            DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
-            DstArg::Imm16(val) => Some(SrcArg::Word(val)),
-            DstArg::Imm32(val) => Some(SrcArg::DWord(val)),
-            DstArg::Ptr32(ptr) => { *next_cycles += 4; Some(SrcArg::DWord(self.read_mem_dword(ptr)?)) }
-            DstArg::Ptr16(ptr) => { *next_cycles += 2; Some(SrcArg::Word(self.read_mem_word(ptr)?)) },
-            DstArg::Ptr8(ptr) => { *next_cycles += 1; Some(SrcArg::Byte(self.read_mem_byte(ptr)?)) },
-            DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
-        }
-    }
+    // fn get_src_arg(&self, arg: DstArg, next_cycles: &mut usize) -> Option<SrcArg> {
+    //     match arg {
+    //         DstArg::Reg8(reg) => Some(SrcArg::Byte(self.get_reg_8(reg)?)),
+    //         DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
+    //         DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
+    //         DstArg::Imm16(val) => Some(SrcArg::Word(val)),
+    //         DstArg::Imm32(val) => Some(SrcArg::DWord(val)),
+    //         DstArg::Ptr32(ptr) => { *next_cycles += 4; Some(SrcArg::DWord(self.read_mem_dword(ptr)?)) }
+    //         DstArg::Ptr16(ptr) => { *next_cycles += 2; Some(SrcArg::Word(self.read_mem_word(ptr)?)) },
+    //         DstArg::Ptr8(ptr) => { *next_cycles += 1; Some(SrcArg::Byte(self.read_mem_byte(ptr)?)) },
+    //         DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
+    //     }
+    // }
 
-    fn get_src_arg_mut(&mut self, arg: DstArg) -> Option<SrcArg> {
-        match arg {
-            DstArg::Reg8(reg) => Some(SrcArg::Byte(self.get_reg_8(reg)?)),
-            DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
-            DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
-            DstArg::Imm16(val) => Some(SrcArg::Word(val)),
-            DstArg::Imm32(val) => Some(SrcArg::DWord(val)),
-            DstArg::Ptr32(ptr) => Some(SrcArg::DWord(self.read_mem_dword(ptr)?)),
-            DstArg::Ptr16(ptr) => Some(SrcArg::Word(self.read_mem_word_mut(ptr)?)),
-            DstArg::Ptr8(ptr) => Some(SrcArg::Byte(self.read_mem_byte_mut(ptr)?)),
-            DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
-        }
-    }
+    // fn get_src_arg_mut(&mut self, arg: DstArg) -> Option<SrcArg> {
+    //     match arg {
+    //         DstArg::Reg8(reg) => Some(SrcArg::Byte(self.get_reg_8(reg)?)),
+    //         DstArg::Reg16(reg) => Some(SrcArg::Word(self.get_reg_16(reg)?)),
+    //         DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
+    //         DstArg::Imm16(val) => Some(SrcArg::Word(val)),
+    //         DstArg::Imm32(val) => Some(SrcArg::DWord(val)),
+    //         DstArg::Ptr32(ptr) => Some(SrcArg::DWord(self.read_mem_dword(ptr)?)),
+    //         DstArg::Ptr16(ptr) => Some(SrcArg::Word(self.read_mem_word_mut(ptr)?)),
+    //         DstArg::Ptr8(ptr) => Some(SrcArg::Byte(self.read_mem_byte_mut(ptr)?)),
+    //         DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
+    //     }
+    // }
 
     fn get_ptr(arg: DstArg) -> Option<u16> {
         match arg {
@@ -812,29 +794,29 @@ impl CPU {
         }
     }
 
-    fn translate_placeholder(&self, placeholder: Placeholder, s: u8, ip: &mut usize, next_cycles: &mut usize) -> DstArg {
-        match placeholder {
-            Placeholder::Reg(reg) => {
-                if s == 1 {
-                    DstArg::Reg16(reg)
-                } else {
-                    DstArg::Reg8(reg)
-                }
-            },
-            Placeholder::Imm => {
-                if s == 1 {
-                    DstArg::Imm16((self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8))
-                } else {
-                    DstArg::Imm8(self.read_ip(ip, next_cycles))
-                }
-            }
-            Placeholder::Reg8(reg) => DstArg::Reg8(reg),
-            Placeholder::Reg16(reg) => DstArg::Reg16(reg),
-            Placeholder::Word(val) => DstArg::Imm16(val),
-            Placeholder::Byte(val) => DstArg::Imm8(val),
-            Placeholder::Ptr => DstArg::Ptr16((self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8))
-        }
-    }
+    // fn translate_placeholder(&self, placeholder: Placeholder, s: u8, ip: &mut usize, next_cycles: &mut usize) -> DstArg {
+    //     match placeholder {
+    //         Placeholder::Reg(reg) => {
+    //             if s == 1 {
+    //                 DstArg::Reg16(reg)
+    //             } else {
+    //                 DstArg::Reg8(reg)
+    //             }
+    //         },
+    //         Placeholder::Imm => {
+    //             if s == 1 {
+    //                 DstArg::Imm16((self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8))
+    //             } else {
+    //                 DstArg::Imm8(self.read_ip(ip, next_cycles))
+    //             }
+    //         }
+    //         Placeholder::Reg8(reg) => DstArg::Reg8(reg),
+    //         Placeholder::Reg16(reg) => DstArg::Reg16(reg),
+    //         Placeholder::Word(val) => DstArg::Imm16(val),
+    //         Placeholder::Byte(val) => DstArg::Imm8(val),
+    //         Placeholder::Ptr => DstArg::Ptr16((self.read_ip(ip, next_cycles) as u16) | ((self.read_ip(ip, next_cycles) as u16) << 8))
+    //     }
+    // }
 
     fn operation_1_arg<T, U>(&mut self, byte: T, word: U) -> SrcArg where
         T: Fn(u8)-> u8,
@@ -1071,13 +1053,9 @@ impl CPU {
     }
 
     pub fn get_instruction_text(&self, loc: usize) -> Option<String> {
-        let (opcode, dst, src, _, _, _, reg_bits) = self.decode_instruction(loc);
-        let mnemonic = opcode.clone()?.mnemonic;
-        Some(match opcode?.clone().num_args {
-            NumArgs::Zero => (mnemonic)(reg_bits)?,
-            NumArgs::One => format!("{} {}", (mnemonic)(reg_bits)?, dst?.to_text()),
-            NumArgs::Two => format!("{} {}, {}", (mnemonic)(reg_bits)?, dst?.to_text(), src?.to_text())
-        })
+        let decoder = instruction::InstructionDecoder::new(self.opcodes.clone(), &self.ram[loc..]);
+
+        Some(decoder.get()?.to_string())
     }
 
     pub fn physical_address(seg: u16, offset: u16) -> u32 {

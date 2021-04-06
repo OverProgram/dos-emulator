@@ -3,10 +3,11 @@ use enumflags2::BitFlags;
 use crate::cpu::{Regs, CPU};
 use crate::cpu::instruction::args::{DstArg, Size};
 use crate::cpu::instruction::args::DstArg::Reg;
+use std::fmt::Formatter;
 
-mod opcode;
+pub mod opcode;
 pub mod actions;
-mod data;
+pub mod data;
 mod args;
 
 #[derive(Clone)]
@@ -34,10 +35,32 @@ impl Instruction {
             next_cycles: 0
         }
     }
+
+    fn get_num_args(&self) -> NumArgs {
+        let arg1 = if let Some(_) = self.dst { true } else { false };
+        let arg2 = if let Some(_) = self.src { true } else { false };
+        if arg1 && arg2 {
+            NumArgs::Two
+        } else if arg1 || arg2 {
+            NumArgs::One
+        } else {
+            NumArgs::Zero
+        }
+    }
+}
+
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> stD::fmt::Result {
+        match self.get_num_args() {
+            NumArgs::Zero => write!(f, "{}", self.mnemonic.clone().unwrap().get(self.reg_bits)),
+            NumArgs::One => write!(f, "{} {}", self.mnemonic.clone().unwrap().get(self.reg_bits), self.dst.clone().unwrap().to_text()),
+            NumArgs::Two => write!(f,"{} {}, {}", self.mnemonic.clone().unwrap().get(self.reg_bits), self.dst.clone().unwrap(), self.src.clone().unwrap())
+        }
+    }
 }
 
 pub struct InstructionDecoder<'a> {
-    opcode_data_array: [Option<Opcode>; 256],
+    opcodes: [Option<Opcode>; 256],
     ram: &'a [u8],
     ip: usize,
     next_cycles: usize,
@@ -48,9 +71,9 @@ pub struct InstructionDecoder<'a> {
 }
 
 impl<'a> InstructionDecoder<'a> {
-    pub fn new(opcode_data_array: [Option<Opcode>; 256], ram: &'a[u8]) -> Self {
+    pub fn new(opcodes: [Option<Opcode>; 256], ram: &'a[u8]) -> Self {
         Self {
-            opcode_data_array,
+            opcodes,
             ram,
             ip: 0,
             next_cycles: 0,
@@ -64,7 +87,7 @@ impl<'a> InstructionDecoder<'a> {
 
     pub fn get(mut self) -> Instruction {
         let code = self.read_ip();
-        self.opcode_data.replace(match self.opcode_data_array[code as usize].clone() {
+        self.opcode_data.replace(match self.opcodes[code as usize].clone() {
             Some(op) => op,
             None => return self.instruction
         });
