@@ -1,4 +1,4 @@
-use crate::cpu::instruction::opcode::{Opcode, Mnemonic, NumArgs};
+use crate::cpu::instruction::opcode::{Opcode, Mnemonic, NumArgs, OpcodeFlags};
 use enumflags2::BitFlags;
 use crate::cpu::{Regs, CPU};
 use crate::cpu::instruction::args::{DstArg, Size};
@@ -8,10 +8,11 @@ use std::fmt::Formatter;
 pub mod opcode;
 pub mod actions;
 pub mod data;
-mod args;
+pub mod args;
 
 #[derive(Clone)]
 pub struct Instruction {
+    pub flags: BitFlags<OpcodeFlags>,
     pub segment: Regs,
     pub action: Option<opcode::OpcodeAction>,
     pub mnemonic: Option<Mnemonic>,
@@ -23,8 +24,18 @@ pub struct Instruction {
 }
 
 impl Instruction {
-    fn new() -> Self {
+    pub fn exec(self, comp: &mut CPU) -> usize {
+        let arg = self.clone();
+        (self.action.unwrap())(comp, arg)
+    }
+
+    pub fn has_flag(&self, flag: OpcodeFlags) -> bool {
+        self.flags.contains(flag)
+    }
+
+    pub fn new() -> Self {
         Self {
+            flags: BitFlags::empty(),
             segment: Regs::DS,
             action: None,
             mnemonic: None,
@@ -49,11 +60,24 @@ impl Instruction {
     }
 }
 
+impl std::fmt::Debug for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Opcode")
+            .field("flags", &self.flags)
+            .field("segment", &self.segment)
+            .field("dst", &self.dst)
+            .field("src", &self.src)
+            .field("reg_bits", &self.reg_bits)
+            .field("length", &self.length)
+            .finish()
+    }
+}
+
 impl std::fmt::Display for Instruction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> stD::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.get_num_args() {
             NumArgs::Zero => write!(f, "{}", self.mnemonic.clone().unwrap().get(self.reg_bits)),
-            NumArgs::One => write!(f, "{} {}", self.mnemonic.clone().unwrap().get(self.reg_bits), self.dst.clone().unwrap().to_text()),
+            NumArgs::One => write!(f, "{} {}", self.mnemonic.clone().unwrap().get(self.reg_bits), self.dst.clone().unwrap()),
             NumArgs::Two => write!(f,"{} {}, {}", self.mnemonic.clone().unwrap().get(self.reg_bits), self.dst.clone().unwrap(), self.src.clone().unwrap())
         }
     }
@@ -87,15 +111,50 @@ impl<'a> InstructionDecoder<'a> {
 
     pub fn get(mut self) -> Instruction {
         let code = self.read_ip();
-        self.opcode_data.replace(match self.opcodes[code as usize].clone() {
+        let opcode_data = match self.get_opcode(code) {
             Some(op) => op,
             None => return self.instruction
-        });
+        };
+
+        self.instruction.flags = opcode_data.flags;
+        self.instruction.action = Some(opcode_data.action.clone());
+        self.instruction.segment = opcode_data.segment;
+        self.instruction.mnemonic = Some(opcode_data.mnemonic.clone());
+
+        self.opcode_data.replace(opcode_data);
 
         self.d = (code & 0x02) >> 1;
         self.s = if self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceDWord) { 2 } else { code & 0x01 };
 
+        self.translate_placeholder();
+
+        let has_src = if let Some(_) = self.instruction.src { true } else { false };
+        let has_dst = if let Some(_) = self.instruction.dst { true } else { false };
+
+        if !has_dst || !has_src {
+            self.get_args();
+        }
+
+        self.instruction.length = self.ip;
+
         self.instruction
+    }
+
+    fn get_opcode(&self, code: u8) -> Option<Opcode> {
+        Self::get_opcode_from_slice(&self.opcodes, code)
+    }
+
+    pub fn get_opcode_from_slice(opcodes: &[Option<Opcode>], opcode: u8) -> Option<Opcode> {
+        match opcodes[opcode as usize].clone() {
+            Some(op) => Some(op),
+            None => match opcodes[(opcode & 0xFE) as usize].clone() {
+                Some(op) => Some(op),
+                None => match opcodes[(opcode & 0xFD) as usize].clone() {
+                    Some(op) => Some(op),
+                    None => Some(opcodes[(opcode & 0xFC) as usize].clone()?)
+                }
+            }
+        }
     }
 
     fn translate_placeholder(&mut self) {
@@ -117,15 +176,15 @@ impl<'a> InstructionDecoder<'a> {
                     arg1_translated.replace(self.translate_shorthand(arg1));
                 }
 
-                if let Some(arg2) = self.opcode_data.clone().unwrap().shorthand2 {
-                    arg2_translated.replace(self.translate_shorthand(arg2));
-                }
-
                 self.s = match arg1_translated.clone() {
                     Some(DstArg::Reg8(_)) => 0,
                     Some(DstArg::Reg16(_)) => 1,
                     _ => self.s
                 };
+
+                if let Some(arg2) = self.opcode_data.clone().unwrap().shorthand2 {
+                    arg2_translated.replace(self.translate_shorthand(arg2));
+                }
 
                 let one_arg = if let opcode::NumArgs::Two = self.opcode_data.clone().unwrap().num_args { false } else { true };
 
@@ -143,8 +202,8 @@ impl<'a> InstructionDecoder<'a> {
 
     fn get_args(&mut self) {
         match self.opcode_data.clone().unwrap().num_args {
-            NumArgs::Two => self.get_two_args(),
-            NumArgs::One => self.get_one_arg(),
+            NumArgs::Two => if !self.opcode_data.as_ref().unwrap().has_shorthand() { self.get_two_args() },
+            NumArgs::One => if let None = self.instruction.dst { self.get_one_arg() },
             NumArgs::Zero => ()
         }
     }
@@ -249,6 +308,7 @@ impl<'a> InstructionDecoder<'a> {
                 0b00 => None,
                 0b01 => Some(self.read_ip() as u16),
                 0b10 => Some(self.read_ip_word()),
+                0b11 => return DstArg::reg_to_arg(rm_bits, self.s),
                 _ => panic!("Invalid mod_bits value")
             };
 
@@ -263,9 +323,9 @@ impl<'a> InstructionDecoder<'a> {
         match placeholder {
             opcode::Placeholder::Reg(reg) => {
                 if self.s == 1 {
-                    DstArg::Reg8(reg)
-                } else {
                     DstArg::Reg16(reg)
+                } else {
+                    DstArg::Reg8(reg)
                 }
             }
             opcode::Placeholder::Imm => {
@@ -276,7 +336,7 @@ impl<'a> InstructionDecoder<'a> {
                 }
             }
             opcode::Placeholder::Reg8(reg) => DstArg::Reg8(reg),
-            opcode::Placeholder::Reg16(reg) => DstArg::Reg8(reg),
+            opcode::Placeholder::Reg16(reg) => DstArg::Reg16(reg),
             opcode::Placeholder::Byte(val) => DstArg::Imm8(val),
             opcode::Placeholder::Word(val) => DstArg::Imm16(val),
             opcode::Placeholder::Ptr => DstArg::Ptr(self.read_ip_word(), Size::Word)

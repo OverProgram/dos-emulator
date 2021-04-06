@@ -7,20 +7,22 @@ use enumflags2::{BitFlags, bitflags};
 use std::fmt::{Debug, Formatter};
 use std::fmt;
 use crate::cpu::instruction::actions::{int, alu};
-use crate::cpu::instruction::data;
+use crate::cpu::instruction::{data, InstructionDecoder};
+use crate::cpu::instruction::args::{SrcArg, DstArg, Size};
+use crate::cpu::instruction::opcode::OpcodeFlags;
 
-#[bitflags]
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[repr(u32)]
-enum OpcodeFlags {
-    Immediate = 0x0001,
-    SizeMismatch = 0x0002,
-    Nop = 0x0004,
-    ForceWord = 0x0008,
-    ForceByte = 0x0010,
-    ForceDWord = 0x0020,
-    ForceDirection = 0x0040,
-}
+// #[bitflags`]
+// #[derive(Copy, Clone, Debug, PartialEq)]
+// #[repr(u32)]
+// enum OpcodeFlags {
+//     Immediate = 0x0001,
+//     SizeMismatch = 0x0002,
+//     Nop = 0x0004,
+//     ForceWord = 0x0008,
+//     ForceByte = 0x0010,
+//     ForceDWord = 0x0020,
+//     ForceDirection = 0x0040,
+// }
 
 pub struct CPUFlags ;
 
@@ -360,10 +362,8 @@ impl CPU {
         if self.next_cycles > 0 {
             self.next_cycles -= 1;
         } else if let Some(opcode) = self.instruction.clone() {
-            (opcode.instruction)(self);
+            opcode.exec(self);
             self.instruction = None;
-            self.src = None;
-            self.dst = None;
             self.src_ptr = None
         } else if let Some(_) = self.irq {
             self.next_cycles += int::int(self);
@@ -373,7 +373,7 @@ impl CPU {
             let physical_address = Self::physical_address(opcode_address.0, opcode_address.1) as usize;
             self.instruction.replace(instruction::InstructionDecoder::new(self.opcodes.clone(), &self.ram[physical_address..]).get());
             self.next_cycles += self.instruction.clone().unwrap().next_cycles;
-            self.regs.get_mut(&Regs::IP).unwrap().value = instruction.length as u16;
+            self.regs.get_mut(&Regs::IP).unwrap().value += self.instruction.clone().unwrap().length as u16;
         }
     }
 
@@ -594,7 +594,7 @@ impl CPU {
     //         DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
     //         DstArg::Imm16(val) => Some(SrcArg::Word(val)),
     //         DstArg::Imm32(val) => Some(SrcArg::DWord(val)),
-    //         DstArg::Ptr32(ptr) => Some(SrcArg::DWord(self.read_mem_dword(ptr)?)),
+    //         DstArg::Ptr(ptr) => Some(SrcArg::DWord(self.read_mem_dword(ptr)?)),
     //         DstArg::Ptr16(ptr) => Some(SrcArg::Word(self.read_mem_word_mut(ptr)?)),
     //         DstArg::Ptr8(ptr) => Some(SrcArg::Byte(self.read_mem_byte_mut(ptr)?)),
     //         DstArg::Reg(reg) => Some(SrcArg::Word(self.regs.get(&reg)?.value))
@@ -603,7 +603,7 @@ impl CPU {
 
     fn get_ptr(arg: DstArg) -> Option<u16> {
         match arg {
-            DstArg::Ptr32(val) | DstArg::Ptr16(val) | DstArg::Ptr8(val) => Some(val),
+            DstArg::Ptr(val, _) => Some(val),
             _ => None
         }
     }
@@ -612,7 +612,7 @@ impl CPU {
         if ptr > self.ram.len() as u16 {
             None
         } else {
-            Some(self.ram[Self::physical_address(self.read_reg(self.seg).unwrap(), ptr) as usize])
+            Some(self.ram[Self::physical_address(self.read_reg(self.instruction.clone().unwrap().segment).unwrap(), ptr) as usize])
         }
     }
 
@@ -629,7 +629,7 @@ impl CPU {
             None
         } else {
             self.next_cycles += 1;
-            Some(self.ram[Self::physical_address(self.read_reg(self.seg).unwrap(), ptr) as usize])
+            Some(self.ram[Self::physical_address(self.read_reg(self.instruction.clone().unwrap().segment).unwrap(), ptr) as usize])
         }
     }
 
@@ -645,7 +645,7 @@ impl CPU {
         if ptr > self.ram.len() as u16 {
             Err("Write out of bounds")
         } else {
-            let seg_val = self.read_reg(self.seg).unwrap();
+            let seg_val = self.read_reg(self.instruction.clone().unwrap().segment).unwrap();
             self.ram[Self::physical_address(seg_val, ptr) as usize] = (val & 0xFF) as u8;
             self.next_cycles += 1;
             Ok(())
@@ -655,6 +655,12 @@ impl CPU {
     fn write_mem_word(&mut self, ptr: u16, val: u16) -> Result<(), &str> {
         self.write_mem_byte(ptr, (val & 0x00FF) as u8).unwrap();
         self.write_mem_byte(ptr + 1, ((val & 0xFF00) >> 8) as u8)
+    }
+
+
+    fn write_mem_dword(&mut self, ptr: u16, val: u32) -> Result<(), &str> {
+        self.write_mem_word(ptr, (val &0xFFFF) as u16).unwrap();
+        self.write_mem_word(ptr + 2, ((val & 0xFFFF0000) >> 16) as u16)
     }
 
     fn read_mem_byte_seg(&mut self, ptr: u16, seg: Regs) -> Option<u8> {
@@ -684,6 +690,11 @@ impl CPU {
     fn write_mem_word_seg(&mut self, ptr: u16, seg: Regs, val: u16) -> Result<(), &str> {
         self.write_mem_byte_seg(ptr, seg, (val & 0x00FF) as u8).unwrap();
         self.write_mem_byte_seg(ptr, seg, ((ptr & 0xFF00) >> 8) as u8)
+    }
+
+    fn write_mem_dword_seg(&mut self, ptr: u16, seg: Regs, val: u32) -> Result<(), &str> {
+        self.write_mem_word_seg(ptr, seg, (val & 0x0000FFFF) as u16).unwrap();
+        self.write_mem_word_seg(ptr + 2, seg, ((val & 0xFFFF0000) >> 16) as u16)
     }
 
     fn read_ip_word(&self, ip: &mut usize, next_cycles: &mut usize) -> u16 {
@@ -729,70 +740,75 @@ impl CPU {
                 };
                 Ok(())
             },
-            DstArg::Ptr16(ptr) => {
-                match val_arg {
-                    SrcArg::Byte(val) => self.write_mem_word(ptr, val as u16),
-                    SrcArg::Word(val) => self.write_mem_word(ptr, val),
-                    _ => return Err("Mismatch operand sizes")
-                }
+            DstArg::Ptr(ptr, size) => {
+                size.write_to_mem(self, ptr, val_arg)
             },
-            DstArg::Ptr8(ptr) => {
-                match val_arg {
-                    SrcArg::Byte(val) => self.write_mem_byte(ptr, val),
-                    SrcArg::Word(val) => self.write_mem_byte(ptr, val as u8),
-                    _ => return Err("Mismatch operand sizes")
-                }
+            DstArg::RegPtr(reg, size) => {
+                let ptr = self.read_reg(reg).unwrap();
+                size.write_to_mem(self, ptr, val_arg)
             },
+            DstArg::RegPtrImm(reg, imm, size) => {
+                let ptr = self.read_reg(reg).unwrap() + imm;
+                size.write_to_mem(self, ptr, val_arg)
+            },
+            DstArg::RegPtrOff(reg1, reg2, size) => {
+                let ptr = self.read_reg(reg1).unwrap() + self.read_reg(reg2).unwrap();
+                size.write_to_mem(self, ptr, val_arg)
+            }
+            DstArg::RegPtrOffImm(reg1, reg2, imm, size) => {
+                let ptr = self.read_reg(reg1).unwrap() + self.read_reg(reg2).unwrap() + imm;
+                size.write_to_mem(self, ptr, val_arg)
+            }
             _ => Err("Invalid dst arg")
         }
     }
 
-    fn translate_mod_rm(&self, mod_bits: u8, rm: u8, s: u8, ip: &mut usize, next_cycles: &mut usize) -> Option<DstArg> {
-        if mod_bits == 0b00 && rm == 0b110 {
-            Some(if s == 1{ DstArg::Ptr16(self.read_ip_word(ip, next_cycles)) } else { DstArg::Ptr8(self.read_ip_word(ip, next_cycles)) })
-        } else {
-            let (reg1, reg2) = match rm {
-                0b000 => Some((Regs::BX, Some(Regs::SI))),
-                0b001 => Some((Regs::BX, Some(Regs::DI))),
-                0b010 => Some((Regs::BP, Some(Regs::SI))),
-                0b011 => Some((Regs::BP, Some(Regs::DI))),
-                0b100 => Some((Regs::SI, None)),
-                0b101 => Some((Regs::DI, None)),
-                0b110 => Some((Regs::BP, None)),
-                0b111 => Some((Regs::BX, None)),
-                _ => None
-            }.unwrap();
-            let ptr_val = if let Some(reg) = reg2 {
-                self.regs.get(&reg1).unwrap().value + self.regs.get(&reg).unwrap().value
-            } else {
-                self.regs.get(&reg1).unwrap().value
-            };
-            if s == 2 {
-                match mod_bits {
-                    0 => Some(DstArg::Ptr32(ptr_val)),
-                    1 => Some(DstArg::Ptr32(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
-                    2 => Some(DstArg::Ptr32(ptr_val + (self.read_ip_word(ip, next_cycles)))),
-                    _ => None
-                }
-            } else if s == 1 {
-                match mod_bits {
-                    0 => Some(DstArg::Ptr16(ptr_val)),
-                    1 => Some(DstArg::Ptr16(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
-                    2 => Some(DstArg::Ptr16(ptr_val + (self.read_ip_word(ip, next_cycles)))),
-                    3 => Some(Self::reg_to_arg(rm, s)),
-                    _ => None
-                }
-            } else {
-                match mod_bits {
-                    0 => Some(DstArg::Ptr8(ptr_val)),
-                    1 => Some(DstArg::Ptr8(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
-                    2 => Some(DstArg::Ptr8(ptr_val + (self.read_ip_word(ip, next_cycles)))),
-                    3 => Some(Self::reg_to_arg(rm, s)),
-                    _ => None
-                }
-            }
-        }
-    }
+    // fn translate_mod_rm(&self, mod_bits: u8, rm: u8, s: u8, ip: &mut usize, next_cycles: &mut usize) -> Option<DstArg> {
+    //     if mod_bits == 0b00 && rm == 0b110 {
+    //         Some(if s == 1{ DstArg::Ptr(self.read_ip_word(ip, next_cycles)) } else { DstArg::Ptr8(self.read_ip_word(ip, next_cycles)) })
+    //     } else {
+    //         let (reg1, reg2) = match rm {
+    //             0b000 => Some((Regs::BX, Some(Regs::SI))),
+    //             0b001 => Some((Regs::BX, Some(Regs::DI))),
+    //             0b010 => Some((Regs::BP, Some(Regs::SI))),
+    //             0b011 => Some((Regs::BP, Some(Regs::DI))),
+    //             0b100 => Some((Regs::SI, None)),
+    //             0b101 => Some((Regs::DI, None)),
+    //             0b110 => Some((Regs::BP, None)),
+    //             0b111 => Some((Regs::BX, None)),
+    //             _ => None
+    //         }.unwrap();
+    //         let ptr_val = if let Some(reg) = reg2 {
+    //             self.regs.get(&reg1).unwrap().value + self.regs.get(&reg).unwrap().value
+    //         } else {
+    //             self.regs.get(&reg1).unwrap().value
+    //         };
+    //         if s == 2 {
+    //             match mod_bits {
+    //                 0 => Some(DstArg::Ptr32(ptr_val)),
+    //                 1 => Some(DstArg::Ptr32(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
+    //                 2 => Some(DstArg::Ptr32(ptr_val + (self.read_ip_word(ip, next_cycles)))),
+    //                 _ => None
+    //             }
+    //         } else if s == 1 {
+    //             match mod_bits {
+    //                 0 => Some(DstArg::Ptr16(ptr_val)),
+    //                 1 => Some(DstArg::Ptr16(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
+    //                 2 => Some(DstArg::Ptr16(ptr_val + (self.read_ip_word(ip, next_cycles)))),
+    //                 3 => Some(Self::reg_to_arg(rm, s)),
+    //                 _ => None
+    //             }
+    //         } else {
+    //             match mod_bits {
+    //                 0 => Some(DstArg::Ptr8(ptr_val)),
+    //                 1 => Some(DstArg::Ptr8(ptr_val + (self.read_ip(ip, next_cycles) as u16))),
+    //                 2 => Some(DstArg::Ptr8(ptr_val + (self.read_ip_word(ip, next_cycles)))),
+    //                 3 => Some(Self::reg_to_arg(rm, s)),
+    //                 _ => None
+    //             }
+    //         }
+    //     }
+    // }
 
     // fn translate_placeholder(&self, placeholder: Placeholder, s: u8, ip: &mut usize, next_cycles: &mut usize) -> DstArg {
     //     match placeholder {
@@ -822,7 +838,7 @@ impl CPU {
         T: Fn(u8)-> u8,
         U: Fn(u16) -> u16
     {
-        match self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+        match self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
             SrcArg::Word(dst) => {
                 Some(SrcArg::Word(word(dst)))
             },
@@ -837,18 +853,18 @@ impl CPU {
     T: Fn(u8, u8)-> u8,
     U: Fn(u16, u16) -> u16
     {
-        match self.src.clone().unwrap() {
+        match self.instruction.clone().unwrap().src.clone().unwrap().to_src_arg(self).unwrap() {
             SrcArg::Word(src) => {
-                if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Word(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     Some(SrcArg::Word(word(src, dst)))
                 } else {
                     None
                 }
             },
             SrcArg::Byte(src) => {
-                if let SrcArg::Byte(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Byte(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     Some(SrcArg::Byte(byte(src, dst)))
-                } else if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+                } else if let SrcArg::Word(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     Some(SrcArg::Word(word(src as u16, dst)))
                 } else {
                     None
@@ -858,31 +874,44 @@ impl CPU {
         }.unwrap()
     }
 
-    fn sub_command(&mut self, opcode: u8, src: Option<SrcArg>, dst: Option<DstArg>, reg_bits: u8) {
-        let tmp_src = self.src.clone();
-        let tmp_dst = self.dst.clone();
-        let tmp_reg_bits = self.reg_bits;
-        self.src = src;
-        self.dst = dst;
-        self.reg_bits = reg_bits;
-        let opcode = self.get_opcode(&opcode).clone();
-        self.next_cycles += (opcode.instruction)(self);
-        self.src = tmp_src;
-        self.dst = tmp_dst;
-        self.reg_bits = tmp_reg_bits;
+    fn sub_command(&mut self, opcode: u8, src: Option<DstArg>, dst: Option<DstArg>, reg_bits: u8) {
+        // let tmp_src = self.instruction.unwrap().src.clone();
+        // let tmp_dst = self.instruction.unwrap().dst.clone();
+        // let tmp_reg_bits = self.instruction.unwrap().reg_bits;
+        // self.instruction.map(move |mut s| { s.src = src; s.dst = dst; s.reg_bits = reg_bits });
+        // let opcode = self.opcodes[opcode as usize].clone().expect("Called subcommand with undefined opcode");
+        // self.next_cycles += (opcode.action)(self, self.instruction.clone().unwrap());
+        // self.instruction.map(move |mut s| { s.src = tmp_src; s.dst = tmp_dst; s.reg_bits = tmp_reg_bits });
+        let instruction = {
+            let mut tmp = instruction::Instruction::new();
+
+            tmp.action = Some(InstructionDecoder::get_opcode_from_slice(&self.opcodes, opcode).unwrap().action);
+            tmp.src = src;
+            tmp.dst = dst;
+            tmp.reg_bits = reg_bits;
+
+            tmp
+        };
+
+        let tmp_instruction = self.instruction.clone();
+        self.instruction.replace(instruction.clone());
+
+        self.next_cycles += instruction.exec(self);
+
+        self.instruction = tmp_instruction;
     }
 
     fn check_carry_add(&mut self, arg: SrcArg) {
         match arg {
             SrcArg::Word(src) => {
-                if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Word(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     self.check_carry_16_bit(src, dst);
                 }
             },
             SrcArg::Byte(src) => {
-                if let SrcArg::Byte(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Byte(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     self.check_carry_8_bit(src, dst);
-                } else if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+                } else if let SrcArg::Word(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     self.check_carry_16_bit(src as u16, dst);
                 }
             }
@@ -955,14 +984,14 @@ impl CPU {
     fn check_carry_sub(&mut self, arg: SrcArg) {
         match arg {
             SrcArg::Word(src) => {
-                if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Word(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     self.check_carry_16_bit(dst, alu::twos_compliment_word(src));
                 }
             },
             SrcArg::Byte(src) => {
-                if let SrcArg::Byte(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+                if let SrcArg::Byte(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     self.check_carry_8_bit(dst, alu::twos_compliment_byte(src));
-                } else if let SrcArg::Word(dst) = self.get_src_arg_mut(self.dst.clone().unwrap()).unwrap() {
+                } else if let SrcArg::Word(dst) = self.instruction.clone().unwrap().dst.unwrap().to_src_arg(self).unwrap() {
                     self.check_carry_16_bit(dst, alu::twos_compliment_word(src as u16));
                 }
             }
@@ -1030,7 +1059,7 @@ impl CPU {
     pub fn run_to_nop(&mut self, loc: u16) {
         self.regs.get_mut(&Regs::IP).unwrap().value = loc;
         self.step();
-        while match self.instruction.clone() { Some(instruction) => !instruction.has_flag(OpcodeFlags::Nop.into()), None => true } {
+        while match self.instruction.clone() { Some(instruction) => !instruction.has_flag(OpcodeFlags::Nop), None => true } {
             self.step();
         }
         while self.next_cycles > 0 {
@@ -1055,7 +1084,7 @@ impl CPU {
     pub fn get_instruction_text(&self, loc: usize) -> Option<String> {
         let decoder = instruction::InstructionDecoder::new(self.opcodes.clone(), &self.ram[loc..]);
 
-        Some(decoder.get()?.to_string())
+        Some(decoder.get().to_string())
     }
 
     pub fn physical_address(seg: u16, offset: u16) -> u32 {

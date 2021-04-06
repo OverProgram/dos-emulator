@@ -62,8 +62,8 @@ class Opcode:
 
         for i in range(len(self.flags) - 1):
             flags += "{} | ".format(self.flags[i])
-        if len(self.flags) > 1:
-            flags += "{} ".format(self.flags[len(self.flags)-1])
+        if len(self.flags) > 0:
+            flags += "{}".format(self.flags[len(self.flags)-1])
 
         flags += " })"
         return flags
@@ -114,7 +114,7 @@ def make_loop_opcodes():
 
 def make_opcodes():
     opcodes = {
-        0x90: Opcode(Opcode.NUM_ARGS_ZERO, Function('nop', 'mem'), 'nop'),
+        0x90: Opcode(Opcode.NUM_ARGS_ZERO, Function('nop', 'mem'), 'nop', flags=(Opcode.FLAG_NOP,)),
         0x88: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov'),
         0xA0: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov', 'Reg(0)', 'Ptr'),
         0xC6: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov', flags=(Opcode.FLAG_IMMEDIATE,)),

@@ -4,6 +4,7 @@ use std::option::Option::Some;
 use crate::cpu::instruction::actions::mem::{nop, mov, ldw, lea, lods};
 use std::sync::Arc;
 use std::rc::Rc;
+use crate::cpu::instruction::Instruction;
 
 #[bitflags]
 #[repr(u32)]
@@ -53,7 +54,7 @@ impl Mnemonic {
     }
 }
 
-pub type OpcodeAction = Rc<dyn Fn(&mut CPU) -> usize>;
+pub type OpcodeAction = Rc<dyn Fn(&mut CPU, Instruction) -> usize>;
 
 #[derive(Clone)]
 pub struct Opcode {
@@ -116,3 +117,12 @@ impl Opcode {
     }
 }
 
+impl std::fmt::Debug for Opcode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Opcode")
+            .field("num_args", &self.num_args)
+            .field("flags", &self.flags)
+            .field("segment", &self.segment)
+            .finish()
+    }
+}

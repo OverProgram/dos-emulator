@@ -17,6 +17,22 @@ impl Size {
             _ => panic!("Invalid s value")
         }
     }
+
+    fn get_comp_ptr(self, comp: &mut CPU, ptr: u16) -> SrcArg {
+        match self {
+            Self::Byte => SrcArg::Byte(comp.read_mem_byte_mut(ptr).unwrap()),
+            Self::Word => SrcArg::Word(comp.read_mem_word_mut(ptr).unwrap()),
+            Self::DWord => SrcArg::DWord(comp.read_mem_dword_mut(ptr).unwrap())
+        }
+    }
+
+    pub fn write_to_mem(self, comp: &mut CPU, ptr: u16, val: SrcArg) -> Result<(), &str> {
+        match self {
+            Self::Byte => val.write_to_arg_byte(comp, ptr),
+            Self::Word => val.write_to_arg_word(comp, ptr),
+            Self::DWord => val.write_to_arg_dword(comp, ptr)
+        }
+    }
 }
 
 impl std::fmt::Display for Size {
@@ -60,10 +76,23 @@ impl DstArg {
             DstArg::Imm8(val) => Some(SrcArg::Byte(val)),
             DstArg::Imm16(val) => Some(SrcArg::Word(val)),
             DstArg::Imm32(val) => Some(SrcArg::DWord(val)),
-            DstArg::Ptr32(ptr) => Some(SrcArg::DWord(comp.read_mem_dword(ptr)?)),
-            DstArg::Ptr16(ptr) => Some(SrcArg::Word(comp.read_mem_word_mut(ptr)?)),
-            DstArg::Ptr8(ptr) => Some(SrcArg::Byte(comp.read_mem_byte_mut(ptr)?)),
+            DstArg::Ptr(ptr, size) => Some(size.get_comp_ptr(comp, ptr)),
+            DstArg::RegPtr(reg, size) => Some({ let ptr = comp.read_reg(reg).unwrap(); size.get_comp_ptr(comp, ptr) }),
+            DstArg::RegPtrImm(reg, imm, size) => Some({ let ptr = comp.read_reg(reg).unwrap() + imm; size.get_comp_ptr(comp, ptr) }),
+            DstArg::RegPtrOff(reg1, reg2, size) => Some({ let ptr = comp.read_reg(reg1).unwrap() + comp.read_reg(reg2).unwrap(); size.get_comp_ptr(comp, ptr) }),
+            DstArg::RegPtrOffImm(reg1, reg2, imm, size) => Some({ let ptr = comp.read_reg(reg1).unwrap() + comp.read_reg(reg2).unwrap() + imm; size.get_comp_ptr(comp, ptr) }),
             DstArg::Reg(reg) => Some(SrcArg::Word(comp.regs.get(&reg)?.value))
+        }
+    }
+
+    pub fn to_ptr(&self, comp: &mut CPU) -> Option<u16> {
+        match self {
+            DstArg::Ptr(val, _) => Some(*val),
+            DstArg::RegPtr(reg, _) => comp.read_reg(*reg),
+            DstArg::RegPtrImm(reg, imm, _) => Some(comp.read_reg(*reg).unwrap() + imm),
+            DstArg::RegPtrOff(reg1, reg2, _) => Some(comp.read_reg(*reg1).unwrap() + comp.read_reg(*reg2).unwrap()),
+            DstArg::RegPtrOffImm(reg1, reg2, imm, _) => Some(comp.read_reg(*reg1).unwrap() + comp.read_reg(*reg2).unwrap() + imm),
+            _ => None
         }
     }
 }
@@ -91,4 +120,30 @@ pub enum SrcArg {
     Byte(u8),
     Word(u16),
     DWord(u32),
+}
+
+impl SrcArg {
+    pub fn write_to_arg_dword(self, comp: &mut CPU, ptr: u16) -> Result<(), &str> {
+        match self {
+            SrcArg::DWord(val) => comp.write_mem_dword(ptr, val),
+            SrcArg::Word(val) => comp.write_mem_dword(ptr, val as u32),
+            SrcArg::Byte(val) => comp.write_mem_dword(ptr, val as u32)
+        }
+    }
+
+    pub fn write_to_arg_word(self, comp: &mut CPU, ptr: u16) -> Result<(), &str> {
+        match self {
+            SrcArg::Byte(val) => comp.write_mem_word(ptr, val as u16),
+            SrcArg::Word(val) => comp.write_mem_word(ptr, val),
+            _ => Err("Mismatch operand sizes")
+        }
+    }
+
+    pub fn write_to_arg_byte(self, comp: &mut CPU, ptr: u16) -> Result<(), &str> {
+        match self {
+            SrcArg::Byte(val) => comp.write_mem_byte(ptr, val),
+            SrcArg::Word(val) => comp.write_mem_byte(ptr, val as u8),
+            _ => Err("Mismatch operand sizes")
+        }
+    }
 }
