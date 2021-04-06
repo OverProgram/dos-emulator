@@ -425,7 +425,7 @@ impl CPU {
                     if s == 0 {
                         dst = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
                         src = Some(DstArg::Imm8(self.read_ip(&mut ip_tmp, &mut next_cycles)));
-                    } else if s ==2 {
+                    } else if s == 2 {
                         dst = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
                         src = Some(DstArg::Imm16(self.read_ip_word(&mut ip_tmp, &mut next_cycles)));
                     }
