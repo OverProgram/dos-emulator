@@ -36,7 +36,7 @@ pub enum Placeholder {
     Ptr
 }
 
-type MnemonicFunc = Rc<dyn Fn(u8) -> String>;
+pub type MnemonicFunc = Rc<dyn Fn(u8) -> String>;
 
 #[derive(Clone)]
 pub enum Mnemonic {
@@ -53,7 +53,7 @@ impl Mnemonic {
     }
 }
 
-type OpcodeAction = Rc<dyn Fn(&mut CPU) -> usize>;
+pub type OpcodeAction = Rc<dyn Fn(&mut CPU) -> usize>;
 
 #[derive(Clone)]
 pub struct Opcode {

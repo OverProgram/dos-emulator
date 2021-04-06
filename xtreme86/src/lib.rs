@@ -1,6 +1,4 @@
 extern crate enumflags2;
-#[macro_use]
-extern crate lazy_static;
 
 use std::fs::File;
 use std::fs;
