@@ -1,3 +1,5 @@
+CPU 286
+
     mov ax, 9
     mov dx, 9
     cmp ax, dx

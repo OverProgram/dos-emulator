@@ -1,3 +1,5 @@
+CPU 286
+
     jmp end
     mov ax, 5
     mov ax, 6

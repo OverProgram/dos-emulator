@@ -1,3 +1,5 @@
+CPU 286
+
     mov ax, 5
     sub ax, 5
     jz end

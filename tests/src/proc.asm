@@ -1,3 +1,5 @@
+CPU 286
+
     mov ax, 0x00
     call proc
     nop

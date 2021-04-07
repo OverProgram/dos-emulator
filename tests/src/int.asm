@@ -1,3 +1,5 @@
+CPU 286
+
     mov ax, 6
     int 0x00
     nop
