@@ -80,9 +80,24 @@ pub fn near_call(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-pub fn ret(comp: &mut CPU, _: Instruction) -> usize {
+fn pop_dst(comp: &mut CPU, instruction: Instruction) {
+    comp.regs.get_mut(&Regs::SP).unwrap().value -= match instruction.dst {
+        Some(DstArg::Imm16(val)) => val,
+        Some(_) => panic!("ret can only get immediate word as arg"),
+        None => 0
+    };
+}
+
+pub fn near_ret(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::IP)), 0b000);
-    comp.sub_command(0xE9, None, Some(DstArg::Reg(Regs::IP)), 0b000);
+    pop_dst(comp, instruction);
+    0
+}
+
+pub fn far_ret(comp: &mut CPU, instruction: Instruction) -> usize {
+    comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::IP)), 0b000);
+    comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::CS)), 0b000);
+    pop_dst(comp, instruction);
     0
 }
 
