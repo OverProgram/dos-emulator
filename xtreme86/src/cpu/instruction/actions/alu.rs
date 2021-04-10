@@ -187,6 +187,9 @@ pub fn rotate_dispatch(comp: &mut CPU, instruction: Instruction) -> usize {
         0b001 => ror(comp, instruction),
         0b010 => rcl(comp, instruction),
         0b011 => rcr(comp, instruction),
+        0b100 => sal(comp, instruction),
+        0b101 => shr(comp, instruction),
+        0b111 => sar(comp, instruction),
         _ => 0
     }
 }
@@ -197,6 +200,9 @@ pub fn rotate_dispatch_mnemonic(instruction: Instruction) -> String {
         0b001 => "ror",
         0b010 => "rcl",
         0b011 => "rcr",
+        0b100 => "sal",
+        0b101 => "shr",
+        0b111 => "sar",
         _ => ""
     }.to_string()
 }
@@ -558,5 +564,109 @@ pub fn rcl(comp: &mut CPU, instruction: Instruction) -> usize {
     };
 
     comp.write_to_arg(*instruction.dst.as_ref().unwrap(), src).unwrap();
+    0
+}
+
+fn shift_check_carry(comp: &mut CPU, instruction: &Instruction, times: u8, left: bool) {
+    let mut mask = if left { 0x01 } else { 0x80 };
+
+    for _ in 1..times {
+        if left {
+            mask <<= 1;
+        } else {
+            mask >>= 1;
+        }
+    }
+
+    if CPU::check_src_arg(&instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap(),
+                          |dst| dst & mask != 0,
+                          |dst| dst & (mask as u16) != 0) {
+        comp.set_flag(CPUFlags::CARRY);
+    } else {
+        comp.clear_flag(CPUFlags::CARRY);
+    }
+}
+fn shift_get_times(comp: &mut CPU, instruction: &Instruction) -> u8 {
+    match instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap() {
+        SrcArg::Byte(val) => val,
+        _ => panic!("shift operation is only allowed byte as src arg")
+    }
+}
+
+
+pub fn sal(comp: &mut CPU, instruction: Instruction) -> usize {
+    let times = match instruction.src.unwrap().to_src_arg(comp).unwrap() {
+        SrcArg::Byte(times) => if times == 1 {
+            if CPU::check_src_arg(&instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap(),
+                                  |dst| ((dst & 0x80) >> 7) == ((dst & 0x40) >> 6),
+                                  |dst| ((dst & 0x8000) >> 15) == ((dst & 0x4000) >> 14)) {
+                comp.set_flag(CPUFlags::OVERFLOW);
+            } else {
+                comp.clear_flag(CPUFlags::OVERFLOW);
+            }
+            times
+        } else {
+            times
+        }
+        _ => panic!("sal can only get a byte arg for times")
+    };
+
+    let res = comp.operation_2_args(|src, dst| dst << src, |src, dst| dst << src);
+
+    shift_check_carry(comp, &instruction, times, true);
+
+    comp.write_to_arg(instruction.dst.unwrap(), res).unwrap();
+
+    0
+}
+
+pub fn shr(comp: &mut CPU, instruction: Instruction) -> usize {
+    comp.set_flag(CPUFlags::OVERFLOW);
+
+    let res = comp.operation_2_args(|src, dst| dst >> src, |dst, src| dst >> src);
+
+    let times = shift_get_times(comp, &instruction);
+    shift_check_carry(comp, &instruction, times, false);
+
+    comp.write_to_arg(instruction.dst.unwrap(), res).unwrap();
+
+    0
+}
+
+fn arithmetic_right_shift_word(arg: u16, times: u16) -> u16 {
+    let sign_bit = arg & 0x8000;
+    let mut res = arg;
+    for _ in 0..times {
+        res >>= 1;
+        res |= sign_bit;
+    }
+    res
+}
+
+fn arithmetic_right_shift_byte(arg: u8, times: u8) -> u8 {
+    let sign_bit = arg & 0x80;
+    let mut res = arg;
+    for _ in 0..times {
+        res >>= 1;
+        res |= sign_bit;
+    }
+    res
+}
+
+pub fn sar(comp: &mut CPU, instruction: Instruction) -> usize {
+    if CPU::check_src_arg(&instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap(),
+                          |dst| dst & 0x80 != 0, |dst| dst & 0x8000 != 0) {
+        comp.set_flag(CPUFlags::OVERFLOW);
+    } else {
+        comp.clear_flag(CPUFlags::OVERFLOW);
+    };
+
+    let res = comp.operation_2_args(arithmetic_right_shift_byte, arithmetic_right_shift_word);
+
+    let times = shift_get_times(comp, &instruction);
+    shift_check_carry(comp, &instruction, times, false);
+
+    comp.write_to_arg(instruction.dst.unwrap(), res).unwrap();
+
     0
 }
