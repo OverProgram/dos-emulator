@@ -1,6 +1,6 @@
 use crate::cpu::instruction::actions::{stack, jmp};
 use crate::cpu::{CPU, Regs, CPUFlags, exceptions};
-use crate::cpu::instruction::actions::flags::cmp;
+use crate::cpu::instruction::actions::flags::{cmp};
 use crate::cpu::instruction::args::{SrcArg, DstArg};
 use crate::cpu::instruction::Instruction;
 
@@ -36,6 +36,76 @@ pub fn twos_compliment_word(arg: u16) -> u16 {
 
 pub fn twos_compliment_byte(arg: u8) -> u8 {
     add_with_carry_8_bit(!arg, 1)
+}
+
+fn rotate_left_byte(arg: u8, times: u8) -> u8 {
+    let last = arg >> (8 - times);
+    (arg << times) | last
+}
+
+fn rotate_left_word(arg: u16, times: u16) -> u16 {
+    let last = arg >> (16 - times);
+    (arg << times) | last
+}
+
+fn rotate_right_byte(arg: u8, times: u8) -> u8 {
+    let mut mask = 0;
+    for _ in 0..times {
+        mask <<= 1;
+        mask |= 1;
+    }
+    let first = arg & mask;
+    (arg >> times) | (first << (8 - times))
+}
+
+fn rotate_right_word(arg: u16, times: u16) -> u16 {
+    let mut mask = 0;
+    for _ in 0..times {
+        mask <<= 1;
+        mask |= 1;
+    }
+    let first = arg & mask;
+    (arg >> times) | (first << (16 - times))
+}
+
+fn rotate_left_carry_byte(arg: u8, times: u8, carry: u8) -> (u8, u8) {
+    let mut num = arg;
+    let mut new_carry = carry;
+    for _ in 0..times {
+        new_carry = num >> 7;
+        num = (num << 1) | new_carry;
+    }
+    (num, new_carry)
+}
+
+fn rotate_left_carry_word(arg: u16, times: u16, carry: u8) -> (u16, u8) {
+    let mut num = arg;
+    let mut new_carry = carry;
+    for _ in 0..times {
+        new_carry = (num >> 15) as u8;
+        num = (num << 1) | (new_carry as u16);
+    }
+    (num, new_carry)
+}
+
+fn rotate_right_carry_byte(arg: u8, times: u8, carry: u8) -> (u8, u8) {
+    let mut num = arg;
+    let mut new_carry = carry;
+    for _ in 0..times {
+        new_carry = num & 0x01;
+        num = (num >> 1) | (new_carry << 7);
+    }
+    (num, new_carry)
+}
+
+fn rotate_right_carry_word(arg: u16, times: u16, carry: u8) -> (u16, u8) {
+    let mut num = arg;
+    let mut new_carry = carry;
+    for _ in 0..times {
+        new_carry = (num & 0x01) as u8;
+        num = (num >> 1) | ((new_carry as u16) << 15);
+    }
+    (num, new_carry)
 }
 
 pub fn alu_dispatch_two_args(comp: &mut CPU, instruction: Instruction) -> usize {
@@ -109,6 +179,26 @@ pub fn mul_dispatch_mnemonic(reg_bits: u8) -> String {
         0b111 => "idiv",
         _ => panic!("invalid reg_bits value")
     })
+}
+
+pub fn rotate_dispatch(comp: &mut CPU, instruction: Instruction) -> usize {
+    match instruction.reg_bits {
+        0b000 => rol(comp, instruction),
+        0b001 => ror(comp, instruction),
+        0b010 => rcl(comp, instruction),
+        0b011 => rcr(comp, instruction),
+        _ => 0
+    }
+}
+
+pub fn rotate_dispatch_mnemonic(reg_bits: u8) -> String {
+    match reg_bits {
+        0b000 => "rol",
+        0b001 => "ror",
+        0b010 => "rcl",
+        0b011 => "rcr",
+        _ => ""
+    }.to_string()
 }
 
 pub fn add(comp: &mut CPU, instruction: Instruction) -> usize {
@@ -387,5 +477,86 @@ pub fn daa(comp: &mut CPU, _: Instruction) -> usize {
     } else {
         comp.clear_flag(CPUFlags::CARRY);
     }
+    0
+}
+
+pub fn ror(comp: &mut CPU, instruction: Instruction) -> usize {
+    let res = comp.operation_2_args(|src, dst| rotate_right_byte(dst, src), |src, dst| rotate_right_word(dst, src));
+    comp.write_to_arg(*instruction.dst.as_ref().unwrap(), res).unwrap();
+    0
+}
+
+
+pub fn rol(comp: &mut CPU, instruction: Instruction) -> usize {
+    let res = comp.operation_2_args(|src, dst| rotate_left_byte(dst, src), |src, dst| rotate_left_word(dst, src));
+    comp.write_to_arg(*instruction.dst.as_ref().unwrap(), res).unwrap();
+    0
+}
+
+fn get_times(src: SrcArg) -> u8 {
+   match src {
+       SrcArg::Byte(val) => val,
+       SrcArg::Word(val) => val as u8,
+       SrcArg::DWord(val) => val as u8
+   }
+}
+
+pub fn rcr(comp: &mut CPU, instruction: Instruction) -> usize {
+    let carry = if comp.check_flag(CPUFlags::CARRY) { 1 } else { 0 };
+    let times = get_times(instruction.src.as_ref().unwrap().to_src_arg(comp).unwrap());
+
+    let src = match instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap() {
+        SrcArg::Byte(dst) => {
+            let (new_src, new_carry) = rotate_right_carry_byte(dst, times, carry);
+            if new_carry & 0x01 == 1 {
+                comp.set_flag(CPUFlags::CARRY);
+            } else {
+                comp.clear_flag(CPUFlags::CARRY);
+            }
+            SrcArg::Byte(new_src)
+        }
+        SrcArg::Word(dst) => {
+            let (new_src, new_carry) = rotate_right_carry_word(dst, times as u16, carry);
+            if new_carry & 0x01 == 1 {
+                comp.set_flag(CPUFlags::CARRY);
+            } else {
+                comp.clear_flag(CPUFlags::CARRY);
+            }
+            SrcArg::Word(new_src)
+        }
+        _ => panic!("rcr only accepts byte or word")
+    };
+
+    comp.write_to_arg(*instruction.dst.as_ref().unwrap(), src).unwrap();
+    0
+}
+
+pub fn rcl(comp: &mut CPU, instruction: Instruction) -> usize {
+    let carry = if comp.check_flag(CPUFlags::CARRY) { 1 } else { 0 };
+    let times = get_times(instruction.src.as_ref().unwrap().to_src_arg(comp).unwrap());
+
+    let src = match instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap() {
+        SrcArg::Byte(dst) => {
+            let (new_src, new_carry) = rotate_left_carry_byte(dst, times, carry);
+            if new_carry & 0x01 == 1 {
+                comp.set_flag(CPUFlags::CARRY);
+            } else {
+                comp.clear_flag(CPUFlags::CARRY);
+            }
+            SrcArg::Byte(new_src)
+        }
+        SrcArg::Word(dst) => {
+            let (new_src, new_carry) = rotate_left_carry_word(dst, times as u16, carry);
+            if new_carry & 0x01 == 1 {
+                comp.set_flag(CPUFlags::CARRY);
+            } else {
+                comp.clear_flag(CPUFlags::CARRY);
+            }
+            SrcArg::Word(new_src)
+        }
+        _ => panic!("rcl only accepts byte or word")
+    };
+
+    comp.write_to_arg(*instruction.dst.as_ref().unwrap(), src).unwrap();
     0
 }
