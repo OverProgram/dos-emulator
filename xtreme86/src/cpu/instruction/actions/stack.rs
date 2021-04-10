@@ -2,13 +2,38 @@ use crate::cpu::{CPU, Regs};
 use crate::cpu::instruction::args::{SrcArg, DstArg, Size};
 use crate::cpu::instruction::Instruction;
 
+fn sign_extend(num: u8) -> u16 {
+    let sign_bit = (num >> 7) as u16;
+    let mut new_num = num as u16;
+    for i in 0..8 {
+        new_num |= sign_bit << i;
+    }
+    new_num
+}
 
 pub fn push(comp: &mut CPU, instruction: Instruction) -> usize {
-    let arg = instruction.dst.clone().unwrap().to_src_arg(comp).unwrap();
+    let tmp_arg = instruction.dst.clone().unwrap().to_src_arg(comp).unwrap();
+    let arg = match tmp_arg {
+        SrcArg::Byte(val) => SrcArg::Word(sign_extend(val)),
+        arg => arg
+    };
     comp.instruction.as_mut().map(|mut s| { s.segment = Regs::SS });
     comp.write_to_arg(DstArg::Ptr(comp.read_reg(Regs::SP).unwrap() - 1, Size::Word), arg).expect("Err");
     comp.regs.get_mut(&Regs::SP).unwrap().value -= 2;
     1
+}
+
+pub fn pusha(comp: &mut CPU, _: Instruction) -> usize {
+    let tmp = comp.regs.get(&Regs::SP).unwrap().value;
+    comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::AX)), 0b110);
+    comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::CX)), 0b110);
+    comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::DX)), 0b110);
+    comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::BX)), 0b110);
+    comp.sub_command(0xFF, None, Some(DstArg::Imm16(tmp)), 0b110);
+    comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::BP)), 0b110);
+    comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::SI)), 0b110);
+    comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::DI)), 0b110);
+    0
 }
 
 pub fn pop(comp: &mut CPU, instruction: Instruction) -> usize {
@@ -16,6 +41,18 @@ pub fn pop(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.write_to_arg(instruction.dst.clone().unwrap(), val).unwrap();
     comp.regs.get_mut(&Regs::SP).unwrap().value += 2;
     1
+}
+
+pub fn popa(comp: &mut CPU, _: Instruction) -> usize {
+    comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::DI)), 0);
+    comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::SI)), 0);
+    comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::BP)), 0);
+    comp.regs.get_mut(&Regs::SP).unwrap().value += 2;
+    comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::BX)), 0);
+    comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::DX)), 0);
+    comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::CX)), 0);
+    comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::AX)), 0);
+    0
 }
 
 pub fn far_call(comp: &mut CPU, instruction: Instruction) -> usize {

@@ -146,4 +146,12 @@ impl SrcArg {
             _ => Err("Mismatch operand sizes")
         }
     }
+
+    pub fn get_size(self) -> Size {
+        match self {
+            Self::Byte(_) => Size::Byte,
+            Self::Word(_) => Size::Word,
+            Self::DWord(_) => Size::DWord
+        }
+    }
 }

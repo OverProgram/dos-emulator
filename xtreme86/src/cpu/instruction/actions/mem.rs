@@ -45,21 +45,55 @@ pub fn lea(comp: &mut CPU, instruction: Instruction) -> usize {
 pub fn lods(comp: &mut CPU, instruction: Instruction) -> usize {
     let src_loc = comp.regs.get(&Regs::SI).unwrap().value;
     let comp_dst = instruction.dst.unwrap();
+    let advance;
     match comp_dst.to_src_arg(comp) {
         Some(SrcArg::Word(_)) => {
             let src = DstArg::Ptr(src_loc, Size::Word).to_src_arg(comp);
-            comp.write_to_arg(DstArg::Reg8(0), src.unwrap()).unwrap();
+            comp.write_to_arg(DstArg::Reg(Regs::AX), src.unwrap()).unwrap();
+            advance = 2;
         }
         Some(SrcArg::Byte(_)) => {
             let src = DstArg::Ptr(src_loc, Size::Byte).to_src_arg(comp);
-            comp.write_to_arg(DstArg::Reg(Regs::AX), src.unwrap()).unwrap();
+            comp.write_to_arg(DstArg::Reg8(0), src.unwrap()).unwrap();
+            advance = 1;
         }
         _ => panic!("LODS can only get a byte or word")
     }
     if comp.check_flag(CPUFlags::DIRECTION) {
-        comp.regs.get_mut(&Regs::SI).unwrap().value += 1;
+        comp.regs.get_mut(&Regs::SI).unwrap().value += advance;
     } else  {
-        comp.regs.get_mut(&Regs::SI).unwrap().value -= 1;
+        comp.regs.get_mut(&Regs::SI).unwrap().value -= advance;
+    }
+    0
+}
+
+pub fn movs(comp: &mut CPU, instruction: Instruction) -> usize {
+    let src_loc = comp.regs.get(&Regs::SI).unwrap().value;
+    let dst_loc = comp.regs.get(&Regs::DI).unwrap().value;
+    let comp_dst = instruction.dst.unwrap();
+    let size = match comp_dst.to_src_arg(comp).unwrap().get_size() {
+        Size::Word => Size::Word,
+        Size::Byte => Size::Byte,
+        Size::DWord => panic!("movs can only get a byte or word")
+    };
+    let src = DstArg::Ptr(src_loc, size).to_src_arg(comp);
+    let tmp_seg = comp.instruction.as_ref().unwrap().segment;
+    comp.instruction.as_mut().map(|mut s| { s.segment = Regs::ES; });
+    comp.write_to_arg(DstArg::Ptr(dst_loc, size), src.unwrap()).unwrap();
+    comp.instruction.as_mut().map(|mut s| { s.segment = tmp_seg });
+
+    let advance = match size {
+        Size::Byte => 1,
+        Size::Word => 2,
+        Size::DWord => panic!("movs can only get a byte or word")
+    };
+
+    if comp.check_flag(CPUFlags::DIRECTION) {
+        comp.regs.get_mut(&Regs::SI).unwrap().value += advance;
+        comp.regs.get_mut(&Regs::DI).unwrap().value += advance;
+    } else {
+        comp.regs.get_mut(&Regs::SI).unwrap().value -= advance;
+        comp.regs.get_mut(&Regs::DI).unwrap().value -= advance;
     }
     0
 }

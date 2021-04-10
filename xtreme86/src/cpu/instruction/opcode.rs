@@ -29,6 +29,7 @@ pub enum Placeholder {
     Reg8(u8),
     Reg16(u8),
     Reg(u8),
+    RegEnum(Regs),
     Byte(u8),
     Word(u16),
     Imm,

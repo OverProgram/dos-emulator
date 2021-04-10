@@ -327,6 +327,9 @@ impl<'a> InstructionDecoder<'a> {
                     DstArg::Reg8(reg)
                 }
             }
+            opcode::Placeholder::RegEnum(reg) => {
+                DstArg::Reg(reg)
+            }
             opcode::Placeholder::Imm => {
                 if self.s == 1 {
                     DstArg::Imm16(self.read_ip_word())
