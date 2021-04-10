@@ -1,6 +1,6 @@
 use crate::cpu::{CPU, CPUFlags, Regs};
 use crate::cpu::instruction::actions::alu::{sub_with_carry_8_bit, sub_with_carry_16_bit};
-use crate::cpu::instruction::args::SrcArg;
+use crate::cpu::instruction::args::{SrcArg, DstArg};
 use crate::cpu::instruction::Instruction;
 
 pub fn clc(comp: &mut CPU, _: Instruction) -> usize {
@@ -58,5 +58,54 @@ pub fn cmps(comp: &mut CPU, instruction: Instruction) -> usize {
 pub fn lahf(comp: &mut CPU, _: Instruction) -> usize {
     let new_ah = comp.regs.get(&Regs::FLAGS).unwrap().get_low();
     comp.regs.get_mut(&Regs::AX).unwrap().set_low(new_ah);
+    0
+}
+
+pub fn rep(comp: &mut CPU, instruction: Instruction) -> usize {
+    let cmp;
+    let op = match instruction.dst.as_ref().unwrap() {
+        DstArg::Opcode(opcode) => match opcode {
+            0x6C | 0x7D | 0xA4 | 0xA5 | 0x6E | 0x6F | 0xAA | 0xAB => {
+                cmp = false;
+                *opcode
+            },
+            0xA6 | 0xA7 | 0xAE | 0xAF => {
+                cmp = true;
+                *opcode
+            }
+            _ => panic!("rep only accepts string operation opcodes")
+        },
+        _ => panic!("rep only accepts string operation opcodes")
+    };
+    while comp.regs.get(&Regs::CX).unwrap().value != 0 && if cmp { !comp.check_flag(CPUFlags::ZERO) } else { true } {
+        comp.sub_command(op, instruction.src.clone(), instruction.dst.clone(), 0);
+        comp.regs.get_mut(&Regs::CX).unwrap().value -= 1;
+    }
+    0
+}
+
+pub fn rep_mnemonic(instruction: Instruction) -> String {
+    match instruction.dst {
+        Some(DstArg::Opcode(op)) => match op {
+            0x6C | 0x7D | 0xA4 | 0xA5 | 0x6E | 0x6F | 0xAA | 0xAB => "rep",
+            0xA6 | 0xA7 | 0xAE | 0xAF => "repe",
+            _ => panic!("rep only accepts string operation opcodes")
+        }
+        _ => panic!("rep only accepts string operation opcodes")
+    }.to_string()
+}
+
+pub fn repne(comp: &mut CPU, instruction: Instruction) -> usize {
+    let op = match instruction.dst.as_ref().unwrap() {
+        DstArg::Opcode(opcode) => match opcode {
+            0xA6 | 0xA7 | 0xAE | 0xAF => *opcode,
+            _ => panic!("repne only accepts string comparison opcodes")
+        },
+        _ => panic!("repne only accepts string comparison opcodes")
+    };
+    while comp.regs.get(&Regs::CX).unwrap().value != 0 || comp.check_flag(CPUFlags::ZERO) {
+        comp.sub_command(op, instruction.src.clone(), instruction.dst.clone(), 0);
+        comp.regs.get_mut(&Regs::CX).unwrap().value -= 1;
+    }
     0
 }

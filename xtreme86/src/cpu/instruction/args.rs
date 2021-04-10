@@ -1,5 +1,6 @@
 use crate::cpu::{Regs, CPU};
 use std::fmt::Formatter;
+use crate::cpu::instruction::opcode::{Opcode, Mnemonic};
 
 #[derive(Copy, Clone, Debug)]
 pub enum Size {
@@ -57,7 +58,8 @@ pub enum DstArg {
     RegPtrImm(Regs, u16, Size),
     RegPtrOff(Regs, Regs, Size),
     RegPtrOffImm(Regs, Regs, u16, Size),
-    Reg(Regs)
+    Reg(Regs),
+    Opcode(u8)
 }
 
 impl DstArg {
@@ -81,7 +83,8 @@ impl DstArg {
             DstArg::RegPtrImm(reg, imm, size) => Some({ let ptr = comp.read_reg(reg).unwrap() + imm; size.get_comp_ptr(comp, ptr) }),
             DstArg::RegPtrOff(reg1, reg2, size) => Some({ let ptr = comp.read_reg(reg1).unwrap() + comp.read_reg(reg2).unwrap(); size.get_comp_ptr(comp, ptr) }),
             DstArg::RegPtrOffImm(reg1, reg2, imm, size) => Some({ let ptr = comp.read_reg(reg1).unwrap() + comp.read_reg(reg2).unwrap() + imm; size.get_comp_ptr(comp, ptr) }),
-            DstArg::Reg(reg) => Some(SrcArg::Word(comp.regs.get(&reg)?.value))
+            DstArg::Reg(reg) => Some(SrcArg::Word(comp.regs.get(&reg)?.value)),
+            DstArg::Opcode(op) => Some(SrcArg::Byte(op))
         }
     }
 
@@ -94,6 +97,13 @@ impl DstArg {
             DstArg::RegPtrOffImm(reg1, reg2, imm, _) => Some(comp.read_reg(*reg1).unwrap() + comp.read_reg(*reg2).unwrap() + imm),
             _ => None
         }
+    }
+}
+
+fn get_opcode_mnemonic(op: u8) -> String {
+    match Opcode::get_opcode_data().get(op as usize).unwrap().clone().unwrap().mnemonic {
+        Mnemonic::Static(mnemonic) => mnemonic,
+        Mnemonic::Dynamic(_) => panic!("can't get dynamic opcode mnemonic")
     }
 }
 
@@ -111,6 +121,7 @@ impl std::fmt::Display for DstArg {
             DstArg::RegPtrOff(reg, off_reg, size) => format!("{} [{} + {}]", size, reg.to_text(), off_reg.to_text()),
             DstArg::RegPtrOffImm(reg, off_reg, imm, size) => format!("{} [{} + {} + {}]", size, reg.to_text(), off_reg.to_text(), imm),
             DstArg::Reg(reg) => reg.to_text(),
+            DstArg::Opcode(op) => get_opcode_mnemonic(*op)
         })
     }
 }

@@ -19,7 +19,7 @@ pub struct Instruction {
     pub dst: Option<args::DstArg>,
     pub reg_bits: u8,
     pub length: usize,
-    pub next_cycles: usize
+    pub next_cycles: usize,
 }
 
 impl Instruction {
@@ -42,7 +42,7 @@ impl Instruction {
             dst: None,
             reg_bits: 0,
             length: 0,
-            next_cycles: 0
+            next_cycles: 0,
         }
     }
 
@@ -75,9 +75,9 @@ impl std::fmt::Debug for Instruction {
 impl std::fmt::Display for Instruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.get_num_args() {
-            NumArgs::Zero => write!(f, "{}", self.mnemonic.clone().unwrap().get(self.reg_bits)),
-            NumArgs::One => write!(f, "{} {}", self.mnemonic.clone().unwrap().get(self.reg_bits), self.dst.clone().unwrap()),
-            NumArgs::Two => write!(f,"{} {}, {}", self.mnemonic.clone().unwrap().get(self.reg_bits), self.dst.clone().unwrap(), self.src.clone().unwrap())
+            NumArgs::Zero => write!(f, "{}", self.mnemonic.clone().unwrap().get(self.clone())),
+            NumArgs::One => write!(f, "{} {}", self.mnemonic.clone().unwrap().get(self.clone()), self.dst.clone().unwrap()),
+            NumArgs::Two => write!(f,"{} {}, {}", self.mnemonic.clone().unwrap().get(self.clone()), self.dst.clone().unwrap(), self.src.clone().unwrap())
         }
     }
 }
@@ -341,7 +341,8 @@ impl<'a> InstructionDecoder<'a> {
             opcode::Placeholder::Reg16(reg) => DstArg::Reg16(reg),
             opcode::Placeholder::Byte(val) => DstArg::Imm8(val),
             opcode::Placeholder::Word(val) => DstArg::Imm16(val),
-            opcode::Placeholder::Ptr => DstArg::Ptr(self.read_ip_word(), Size::Word)
+            opcode::Placeholder::Ptr => DstArg::Ptr(self.read_ip_word(), Size::Word),
+            opcode::Placeholder::Opcode => DstArg::Opcode(self.read_ip()),
         }
     }
 

@@ -33,10 +33,11 @@ pub enum Placeholder {
     Byte(u8),
     Word(u16),
     Imm,
-    Ptr
+    Ptr,
+    Opcode
 }
 
-pub type MnemonicFunc = Rc<dyn Fn(u8) -> String>;
+pub type MnemonicFunc = Rc<dyn Fn(Instruction) -> String>;
 
 #[derive(Clone)]
 pub enum Mnemonic {
@@ -45,10 +46,10 @@ pub enum Mnemonic {
 }
 
 impl Mnemonic {
-    pub fn get(self, reg_bits: u8) -> String {
+    pub fn get(self, instruction: Instruction) -> String {
         match self {
             Mnemonic::Static(val) => val,
-            Mnemonic::Dynamic(func) => func(reg_bits)
+            Mnemonic::Dynamic(func) => func(instruction)
         }
     }
 }

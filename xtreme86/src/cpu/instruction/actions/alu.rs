@@ -121,8 +121,8 @@ pub fn alu_dispatch_two_args(comp: &mut CPU, instruction: Instruction) -> usize 
     }
 }
 
-pub fn alu_dispatch_two_args_mnemonic(reg_bits: u8) -> String {
-    String::from(match reg_bits {
+pub fn alu_dispatch_two_args_mnemonic(instruction: Instruction) -> String {
+    String::from(match instruction.reg_bits {
         0b000 => "add",
         0b001 => "or",
         0b010 => "adc",
@@ -146,8 +146,8 @@ pub fn alu_dispatch_one_arg(comp: &mut CPU, instruction: Instruction) -> usize {
     }
 }
 
-pub fn alu_dispatch_one_arg_mnemonic(reg_bits: u8) -> String {
-    String::from(match reg_bits {
+pub fn alu_dispatch_one_arg_mnemonic(instruction: Instruction) -> String {
+    String::from(match instruction.reg_bits {
         0b000 => "inc",
         0b001 => "dec",
         0b010 | 0b011 => "call",
@@ -169,8 +169,8 @@ pub fn mul_dispatch(comp: &mut CPU, instruction: Instruction) -> usize {
     }
 }
 
-pub fn mul_dispatch_mnemonic(reg_bits: u8) -> String {
-    String::from(match reg_bits {
+pub fn mul_dispatch_mnemonic(instruction: Instruction) -> String {
+    String::from(match instruction.reg_bits {
         0b010 => "not",
         0b011 => "neg",
         0b100 => "mul",
@@ -191,8 +191,8 @@ pub fn rotate_dispatch(comp: &mut CPU, instruction: Instruction) -> usize {
     }
 }
 
-pub fn rotate_dispatch_mnemonic(reg_bits: u8) -> String {
-    match reg_bits {
+pub fn rotate_dispatch_mnemonic(instruction: Instruction) -> String {
+    match instruction.reg_bits {
         0b000 => "rol",
         0b001 => "ror",
         0b010 => "rcl",
