@@ -197,6 +197,7 @@ def make_opcodes():
         0xA6: Opcode(Opcode.NUM_ARGS_ZERO, Function('cmps', 'flags'), 'cmps',
                      shorthand1='Reg16(6)', shorthand2='Reg16(7)'),
         0x9F: Opcode(Opcode.NUM_ARGS_ZERO, Function('lahf', 'flags'), 'lahf'),
+        0x9E: Opcode(Opcode.NUM_ARGS_ZERO, Function('sahf', 'flags'), 'sahf'),
         0xF3: Opcode(Opcode.NUM_ARGS_ONE, Function('rep', 'flags'), Function('rep_mnemonic', 'flags'),
                      shorthand1='Opcode'),
         0xF2: Opcode(Opcode.NUM_ARGS_ONE, Function('repne', 'flags'), 'repne', shorthand1='Opcode'),

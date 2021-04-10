@@ -168,7 +168,7 @@ impl Opcode {
 			None,
 			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(stack::push), mnemonic: Mnemonic::Static(String::from("pushf")), shorthand1: Some(Placeholder::RegEnum(Regs::FLAGS)), shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(stack::pop), mnemonic: Mnemonic::Static(String::from("popf")), shorthand1: Some(Placeholder::RegEnum(Regs::FLAGS)), shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
-			None,
+			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(flags::sahf), mnemonic: Mnemonic::Static(String::from("sahf")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(flags::lahf), mnemonic: Mnemonic::Static(String::from("lahf")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::Two, action: Rc::new(mem::mov), mnemonic: Mnemonic::Static(String::from("mov")), shorthand1: Some(Placeholder::Reg(0)), shorthand2: Some(Placeholder::Ptr), flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			None,

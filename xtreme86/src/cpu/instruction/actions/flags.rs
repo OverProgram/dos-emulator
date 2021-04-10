@@ -61,6 +61,12 @@ pub fn lahf(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
+pub fn sahf(comp: &mut CPU, _: Instruction) -> usize {
+    let new_flags= comp.regs.get(&Regs::AX).unwrap().get_low();
+    comp.regs.get_mut(&Regs::FLAGS).unwrap().set_low(new_flags);
+    0
+}
+
 pub fn rep(comp: &mut CPU, instruction: Instruction) -> usize {
     let cmp;
     let op = match instruction.dst.as_ref().unwrap() {
