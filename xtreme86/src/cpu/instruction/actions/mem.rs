@@ -1,6 +1,7 @@
-use crate::cpu::{CPU, Regs, CPUFlags};
+use crate::cpu::{CPU, Regs};
 use crate::cpu::instruction::args::{SrcArg, DstArg, Size};
 use crate::cpu::instruction::Instruction;
+use crate::cpu::instruction::actions::flags::{advance_si, advance_di};
 
 pub fn mov(comp: &mut CPU, instruction: Instruction) -> usize {
     let src = instruction.src.clone().unwrap().to_src_arg(comp).unwrap();
@@ -72,25 +73,23 @@ pub fn lea(comp: &mut CPU, instruction: Instruction) -> usize {
 pub fn lods(comp: &mut CPU, instruction: Instruction) -> usize {
     let src_loc = comp.regs.get(&Regs::SI).unwrap().value;
     let comp_dst = instruction.dst.unwrap();
-    let advance;
+    let size;
     match comp_dst.to_src_arg(comp) {
         Some(SrcArg::Word(_)) => {
             let src = DstArg::Ptr(src_loc, Size::Word).to_src_arg(comp);
             comp.write_to_arg(DstArg::Reg(Regs::AX), src.unwrap()).unwrap();
-            advance = 2;
+            size = Size::Word;
         }
         Some(SrcArg::Byte(_)) => {
             let src = DstArg::Ptr(src_loc, Size::Byte).to_src_arg(comp);
             comp.write_to_arg(DstArg::Reg8(0), src.unwrap()).unwrap();
-            advance = 1;
+            size = Size::Byte;
         }
         _ => panic!("LODS can only get a byte or word")
     }
-    if comp.check_flag(CPUFlags::DIRECTION) {
-        comp.regs.get_mut(&Regs::SI).unwrap().value += advance;
-    } else  {
-        comp.regs.get_mut(&Regs::SI).unwrap().value -= advance;
-    }
+
+    advance_si(comp, size);
+
     0
 }
 
@@ -110,19 +109,9 @@ pub fn movs(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.write_to_arg(DstArg::Ptr(dst_loc, size), src.unwrap()).unwrap();
     comp.instruction.as_mut().map(|mut s| { s.segment = tmp_seg });
 
-    let advance = match size {
-        Size::Byte => 1,
-        Size::Word => 2,
-        Size::DWord => panic!("movs can only get a byte or word")
-    };
+    advance_di(comp, size);
+    advance_si(comp, size);
 
-    if comp.check_flag(CPUFlags::DIRECTION) {
-        comp.regs.get_mut(&Regs::SI).unwrap().value += advance;
-        comp.regs.get_mut(&Regs::DI).unwrap().value += advance;
-    } else {
-        comp.regs.get_mut(&Regs::SI).unwrap().value -= advance;
-        comp.regs.get_mut(&Regs::DI).unwrap().value -= advance;
-    }
     0
 }
 
@@ -134,18 +123,7 @@ pub fn stos(comp: &mut CPU, instruction: Instruction) -> usize {
 
     comp.write_to_arg(dst, src).unwrap();
 
-    let advance = match size {
-        Size::Byte => 1,
-        Size::Word => 2,
-        _ => panic!("stos can only accept byte or word")
-    };
-
-
-    if comp.check_flag(CPUFlags::DIRECTION) {
-        comp.regs.get_mut(&Regs::DI).unwrap().value += advance;
-    } else  {
-        comp.regs.get_mut(&Regs::DI).unwrap().value -= advance;
-    }
+    advance_di(comp, size);
 
     0
 }

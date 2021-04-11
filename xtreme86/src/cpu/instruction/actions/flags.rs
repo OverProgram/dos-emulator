@@ -54,29 +54,59 @@ pub fn test(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-//TODO: Test
+pub fn advance_di(comp: &mut CPU, size: Size) {
+    let advance = match size {
+        Size::Byte => 1,
+        Size::Word => 2,
+        Size::DWord => panic!("string operations only support byte and word")
+    };
+
+
+    let new_di = if comp.check_flag(CPUFlags::DIRECTION) {
+        comp.regs.get(&Regs::DI).unwrap().value.wrapping_sub(advance)
+    } else {
+        comp.regs.get(&Regs::DI).unwrap().value.wrapping_add(advance)
+    };
+
+    comp.regs.get_mut(&Regs::DI).unwrap().value = new_di;
+}
+
+pub fn advance_si(comp: &mut CPU, size: Size) {
+    let advance = match size {
+        Size::Byte => 1,
+        Size::Word => 2,
+        Size::DWord => panic!("string operations only support byte and word")
+    };
+
+
+    let new_si = if comp.check_flag(CPUFlags::DIRECTION) {
+        comp.regs.get(&Regs::SI).unwrap().value.wrapping_sub(advance)
+    } else {
+        comp.regs.get(&Regs::SI).unwrap().value.wrapping_add(advance)
+    };
+
+    comp.regs.get_mut(&Regs::SI).unwrap().value = new_si;
+}
+
 pub fn cmps(comp: &mut CPU, instruction: Instruction) -> usize {
     let ptr2 = comp.regs.get(&Regs::DI).unwrap().value;
     comp.instruction.as_mut().map(|mut s| { s.segment = Regs::ES });
-    let src_as_dst = instruction.src.clone().unwrap();
-    let (src, advance) = match src_as_dst.to_src_arg(comp).unwrap() {
-        SrcArg::Byte(_) => (SrcArg::Byte(comp.read_mem_byte_mut(ptr2).unwrap()), 1),
-        SrcArg::Word(_) => (SrcArg::Word(comp.read_mem_word_mut(ptr2).unwrap()), 2),
+    let src_as_dst = instruction.dst.clone().unwrap();
+    let src_dst = match src_as_dst.to_src_arg(comp).unwrap() {
+        SrcArg::Byte(_) => DstArg::Imm8(comp.read_mem_byte_mut(ptr2).unwrap()),
+        SrcArg::Word(_) => DstArg::Imm16(comp.read_mem_word_mut(ptr2).unwrap()),
         _ => panic!("cmps can only accept byte or word")
     };
+    let src = src_dst.to_src_arg(comp).unwrap();
 
-    comp.instruction.as_mut().map(|mut s| { s.segment = Regs::DS; s.src = Some(src_as_dst) });
+    comp.instruction.as_mut().map(|mut s| { s.segment = Regs::DS; s.dst = Some(DstArg::RegPtr(Regs::SI, src.clone().get_size())); s.src = Some(src_dst) });
     comp.check_carry_sub(src);
     let dif = comp.operation_2_args(|src, dst| sub_with_carry_8_bit(dst, src), |src, dst| sub_with_carry_16_bit(dst, src));
     comp.check_flags_in_result(&dif, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
 
-    if comp.check_flag(CPUFlags::DIRECTION) {
-        comp.regs.get_mut(&Regs::DI).unwrap().value += advance;
-        comp.regs.get_mut(&Regs::SI).unwrap().value += advance;
-    } else {
-        comp.regs.get_mut(&Regs::DI).unwrap().value -= advance;
-        comp.regs.get_mut(&Regs::SI).unwrap().value -= advance;
-    };
+    let size = src.get_size();
+    advance_di(comp, size);
+    advance_si(comp, size);
 
     0
 }
@@ -91,17 +121,7 @@ pub fn scas(comp: &mut CPU, instruction: Instruction) -> usize {
     let dif = comp.operation_2_args(|src, dst| sub_with_carry_8_bit(dst, src), |src, dst| sub_with_carry_16_bit(dst,src));
     comp.check_flags_in_result(&dif, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
 
-    let advance = match size {
-        Size::Word => 2,
-        Size::Byte => 1,
-        _ => panic!("scas can only accept byte or word")
-    };
-
-    if comp.check_flag(CPUFlags::DIRECTION) {
-        comp.regs.get_mut(&Regs::DI).unwrap().value += advance;
-    } else {
-        comp.regs.get_mut(&Regs::DI).unwrap().value -= advance;
-    };
+    advance_di(comp, size);
 
     0
 }

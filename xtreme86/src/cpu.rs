@@ -1055,6 +1055,23 @@ impl CPU {
         (self.ram[loc] as u16) | ((self.ram[loc + 1] as u16) << 8)
     }
 
+    pub fn write_bytes(&mut self, start_loc: usize, bytes: Vec<u8>) -> Result<(), String> {
+        for (i, byte) in bytes.iter().enumerate() {
+            *self.ram.get_mut(start_loc + i).map_or(Err("Index out of bounds"), |s| Ok(s))? = *byte;
+        }
+        Ok(())
+    }
+
+    pub fn write_bytes_ds(&mut self, start_loc: u16, bytes: Vec<u8>) -> Result<(), String> {
+        let ds = self.regs.get(&Regs::DS).unwrap().value;
+        self.write_bytes(Self::physical_address(ds, start_loc) as usize, bytes)
+    }
+
+    pub fn write_bytes_es(&mut self, start_loc: u16, bytes: Vec<u8>) -> Result<(), String> {
+        let es = self.regs.get(&Regs::ES).unwrap().value;
+        self.write_bytes(Self::physical_address(es, start_loc) as usize, bytes)
+    }
+
     pub fn load(&mut self, data: Vec<u8>, loc: usize) {
         for i in 0..data.len() {
             self.ram[loc + i] = data[i];
