@@ -262,10 +262,14 @@ mod int_test {
     #[test]
     fn test_soft_int() {
         let mut computer = new_cpu_from_file("obj/int.out");
-        computer.load(vec![0x0E, 0x00, 0x3F, 0x10], 0);
-        computer.load(vec![0x0E, 0x00, 0x3F, 0x10], 20);
+        computer.load(vec![0x14, 0x00, 0x3F, 0x10], 0);
+        computer.load(vec![0x14, 0x00, 0x3F, 0x10], 20);
+        computer.load(vec![0x14, 0x00, 0x3F, 0x10], 16);
         computer.write_bytes_ds(0, vec![0x00, 0x00, 0x05, 0x00]).unwrap();
         computer.run_to_nop(0);
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 5);
+        assert_eq!(computer.read_reg(Regs::SP).unwrap(), 0xFFFF);
+        computer.run_to_nop_from_ip();
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 5);
         assert_eq!(computer.read_reg(Regs::SP).unwrap(), 0xFFFF);
         computer.run_to_nop_from_ip();

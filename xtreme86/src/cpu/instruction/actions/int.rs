@@ -36,7 +36,7 @@ pub fn int(comp: &mut CPU) -> usize {
 
 pub fn into(comp: &mut CPU, _: Instruction) -> usize {
     if comp.check_flag(CPUFlags::OVERFLOW) {
-        comp.sub_command(0xCD, None, Some(DstArg::Imm8(3)), 0);
+        comp.except(exceptions::INTO).unwrap();
     }
     0
 }
@@ -48,7 +48,6 @@ pub fn iret(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn bound(comp: &mut CPU, instruction: Instruction) -> usize {
     if let Some(SrcArg::DWord(bounds)) = instruction.src.clone().unwrap().to_src_arg(comp) {
         match instruction.dst.clone().unwrap() {
