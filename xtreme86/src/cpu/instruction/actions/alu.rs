@@ -113,6 +113,7 @@ pub fn alu_dispatch_two_args(comp: &mut CPU, instruction: Instruction) -> usize 
         0b000 => add(comp, instruction),
         0b001 => or(comp, instruction),
         0b010 => adc(comp, instruction),
+        0b011 => sbb(comp, instruction),
         0b100 => and(comp, instruction),
         0b101 => sub(comp, instruction),
         0b110 => xor(comp, instruction),
@@ -126,6 +127,7 @@ pub fn alu_dispatch_two_args_mnemonic(instruction: Instruction) -> String {
         0b000 => "add",
         0b001 => "or",
         0b010 => "adc",
+        0b011 => "sbb",
         0b100 => "and",
         0b101 => "sub",
         0b110 => "xor",
@@ -246,6 +248,15 @@ pub fn sub(comp: &mut CPU, instruction: Instruction) -> usize {
     let dif = comp.operation_2_args(|src, dst| sub_with_carry_8_bit(dst, src), |src, dst| sub_with_carry_16_bit(dst, src));
     comp.check_flags_in_result(&dif, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
     comp.write_to_arg(instruction.dst.clone().unwrap(), dif).unwrap();
+    0
+}
+
+pub fn sbb(comp: &mut CPU, _: Instruction) -> usize {
+    let cf = if comp.check_flag(CPUFlags::CARRY) { 1u8 } else { 0u8 };
+    let src = comp.operation_2_args(|src, _| src + cf, |src, _| src + (cf as u16));
+    comp.check_carry_sub(src);
+    let res = comp.operation_2_args(|src, dst| dst - (src + cf), |src, dst| dst - (src + (cf as u16)));
+    comp.check_flags_in_result(&res, CPUFlags::PARITY | CPUFlags::ZERO | CPUFlags::SIGN | CPUFlags::AUX_CARRY);
     0
 }
 
