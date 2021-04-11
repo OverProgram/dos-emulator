@@ -119,6 +119,7 @@ def make_opcodes():
         0xA0: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov', 'Reg(0)', 'Ptr'),
         0xC6: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov', flags=(Opcode.FLAG_IMMEDIATE,)),
         0x86: Opcode(Opcode.NUM_ARGS_TWO, Function('xchg', 'mem'), 'xchg'),
+        0xD7: Opcode(Opcode.NUM_ARGS_ZERO, Function('xlat', 'mem'), 'xlat'),
         0xC5: Opcode(Opcode.NUM_ARGS_TWO, Function('ldw', 'mem'), 'lds', flags=(Opcode.FLAG_FORCE_DWORD,)),
         0xC4: Opcode(Opcode.NUM_ARGS_TWO, Function('ldw', 'mem'), 'les', flags=(Opcode.FLAG_FORCE_DWORD,),
                      segment=Opcode.SEG_ES),

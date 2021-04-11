@@ -225,7 +225,7 @@ impl Opcode {
 			None,
 			Some(Opcode{ num_args: NumArgs::One, action: Rc::new(alu::aad), mnemonic: Mnemonic::Static(String::from("aad")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ Immediate | ForceByte }), segment: Regs::DS }),
 			None,
-			None,
+			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(mem::xlat), mnemonic: Mnemonic::Static(String::from("xlat")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			None,
 			None,
 			None,

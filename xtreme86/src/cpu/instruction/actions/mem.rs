@@ -47,6 +47,15 @@ pub fn xchg(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+pub fn xlat(comp: &mut CPU, _: Instruction) -> usize {
+    let al = comp.regs.get(&Regs::AX).unwrap().get_low() as u16;
+    let src = DstArg::RegPtrImm(Regs::BX, al, Size::Byte).to_src_arg(comp).unwrap();
+
+    comp.write_to_arg(DstArg::Reg8(4), src).unwrap();
+
+    0
+}
+
 pub fn lea(comp: &mut CPU, instruction: Instruction) -> usize {
     let new_dst = SrcArg::Word(instruction.src.as_ref().unwrap().to_ptr(comp).unwrap());
     let old_dst = instruction.dst.unwrap();
