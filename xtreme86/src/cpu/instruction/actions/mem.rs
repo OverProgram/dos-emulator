@@ -22,19 +22,28 @@ pub fn cwd(comp: &mut CPU, _: Instruction) -> usize {
 }
 
 //TODO: Test
-pub fn ldw(comp: &mut CPU, instruction: Instruction) -> usize {
+pub fn ldw(comp: &mut CPU, instruction: Instruction, seg: Regs) -> usize {
     let value = match instruction.src.clone().unwrap().to_src_arg(comp) {
         Some(SrcArg::DWord(val)) => val,
         _ => panic!("LDS/LES must get a dword as src")
     };
-    let seg = instruction.segment;
     comp.regs.get_mut(&seg).unwrap().value = (value >> 16) as u16;
     let dst = match instruction.dst {
         Some(DstArg::Reg16(reg)) => DstArg::Reg16(reg),
         _ => panic!("LDS/LES must get a Reg16 as dst")
     };
     comp.write_to_arg(dst, SrcArg::Word((value & 0xFFFF) as u16)).unwrap();
+    comp.write_to_arg(DstArg::Reg(seg), SrcArg::Word((value >> 16) as u16)).unwrap();
     0
+}
+
+
+pub fn les(comp: &mut CPU, instruction: Instruction) -> usize {
+    ldw(comp, instruction, Regs::ES)
+}
+
+pub fn lds(comp: &mut CPU, instruction: Instruction) -> usize {
+    ldw(comp, instruction, Regs::DS)
 }
 
 //TODO: Test
