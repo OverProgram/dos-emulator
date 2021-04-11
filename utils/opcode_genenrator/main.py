@@ -118,6 +118,7 @@ def make_opcodes():
         0x88: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov'),
         0xA0: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov', 'Reg(0)', 'Ptr'),
         0xC6: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov', flags=(Opcode.FLAG_IMMEDIATE,)),
+        0x86: Opcode(Opcode.NUM_ARGS_TWO, Function('xchg', 'mem'), 'xchg'),
         0xC5: Opcode(Opcode.NUM_ARGS_TWO, Function('ldw', 'mem'), 'lds', flags=(Opcode.FLAG_FORCE_DWORD,)),
         0xC4: Opcode(Opcode.NUM_ARGS_TWO, Function('ldw', 'mem'), 'les', flags=(Opcode.FLAG_FORCE_DWORD,),
                      segment=Opcode.SEG_ES),
@@ -231,6 +232,9 @@ def make_opcodes():
                                    (Opcode.FLAG_IMMEDIATE,))
         opcodes[0xB8 + i] = Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov', 'Reg16({})'.format(i), 'Imm',
                                    (Opcode.FLAG_IMMEDIATE,))
+        if i > 0:
+            opcodes[0x90 + i] = Opcode(Opcode.NUM_ARGS_TWO, Function('xchg', 'mem'), 'xchg', shorthand1='Reg16(0)',
+                                       shorthand2='Reg16({})'.format(i))
         opcodes[0x40 + i] = Opcode(Opcode.NUM_ARGS_ONE, Function('inc', 'alu'), 'inc', shorthand1='Reg16({})'.format(i))
         opcodes[0x48 + i] = Opcode(Opcode.NUM_ARGS_ONE, Function('dec', 'alu'), 'dec', shorthand1='Reg16({})'.format(i))
         opcodes[0x50 + i] = Opcode(Opcode.NUM_ARGS_ONE, Function('push', 'stack'), 'push',

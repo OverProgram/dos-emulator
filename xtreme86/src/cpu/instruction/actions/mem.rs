@@ -35,6 +35,18 @@ pub fn ldw(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+pub fn xchg(comp: &mut CPU, instruction: Instruction) -> usize {
+    let dst = instruction.dst.as_ref().unwrap();
+    let src = instruction.src.as_ref().unwrap();
+    let dst_val = dst.to_src_arg(comp).unwrap();
+    let src_val = src.to_src_arg(comp).unwrap();
+
+    comp.write_to_arg(*dst, src_val).unwrap();
+    comp.write_to_arg(*src, dst_val).unwrap();
+
+    0
+}
+
 pub fn lea(comp: &mut CPU, instruction: Instruction) -> usize {
     let new_dst = SrcArg::Word(instruction.src.as_ref().unwrap().to_ptr(comp).unwrap());
     let old_dst = instruction.dst.unwrap();
