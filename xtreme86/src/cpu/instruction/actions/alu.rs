@@ -1,6 +1,6 @@
 use crate::cpu::instruction::actions::{stack, jmp};
 use crate::cpu::{CPU, Regs, CPUFlags, exceptions};
-use crate::cpu::instruction::actions::flags::{cmp};
+use crate::cpu::instruction::actions::flags::{cmp, test};
 use crate::cpu::instruction::args::{SrcArg, DstArg};
 use crate::cpu::instruction::Instruction;
 
@@ -159,8 +159,10 @@ pub fn alu_dispatch_one_arg_mnemonic(instruction: Instruction) -> String {
     })
 }
 
+//TODO: check mul, div, imul, idiv, and correctness in generation script
 pub fn mul_dispatch(comp: &mut CPU, instruction: Instruction) -> usize {
     match comp.instruction.clone().unwrap().reg_bits {
+        0b000 => test(comp, instruction),
         0b010 => not(comp, instruction),
         0b011 => neg(comp, instruction),
         0b100 => mul(comp, instruction),
@@ -173,6 +175,7 @@ pub fn mul_dispatch(comp: &mut CPU, instruction: Instruction) -> usize {
 
 pub fn mul_dispatch_mnemonic(instruction: Instruction) -> String {
     String::from(match instruction.reg_bits {
+        0b000 => "test",
         0b010 => "not",
         0b011 => "neg",
         0b100 => "mul",
