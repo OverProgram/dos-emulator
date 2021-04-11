@@ -281,6 +281,14 @@ mod test_flags {
         comp.run_to_nop_from_ip();
         assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x30);
     }
+
+    #[test]
+    fn test_flag() {
+        let mut comp = new_cpu_from_file("obj/flag.out");
+        comp.run_to_nop(0);
+        println!("{}", comp.read_reg(Regs::FLAGS).unwrap());
+        assert_ne!(comp.read_reg(Regs::FLAGS).unwrap() & 0x80, 0);
+    }
 }
 
 mod test_string {

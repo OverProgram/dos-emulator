@@ -119,7 +119,6 @@ pub fn enter(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.regs.get_mut(&Regs::BP).unwrap().value = frame_ptr;
     let new_sp = comp.regs.get(&Regs::SP).unwrap().value - dst;
     comp.regs.get_mut(&Regs::SP).unwrap().value = new_sp;
-    println!("in enter");
     0
 }
 

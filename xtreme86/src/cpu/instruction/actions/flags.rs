@@ -125,16 +125,14 @@ pub fn scas(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn lahf(comp: &mut CPU, _: Instruction) -> usize {
     let new_ah = comp.regs.get(&Regs::FLAGS).unwrap().get_low();
-    comp.regs.get_mut(&Regs::AX).unwrap().set_low(new_ah);
+    comp.regs.get_mut(&Regs::AX).unwrap().set_high(new_ah);
     0
 }
 
-//TODO: Test
 pub fn sahf(comp: &mut CPU, _: Instruction) -> usize {
-    let new_flags= comp.regs.get(&Regs::AX).unwrap().get_low();
+    let new_flags= comp.regs.get(&Regs::AX).unwrap().get_high();
     comp.regs.get_mut(&Regs::FLAGS).unwrap().set_low(new_flags);
     0
 }
