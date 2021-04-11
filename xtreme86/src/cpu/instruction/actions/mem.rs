@@ -8,18 +8,21 @@ pub fn mov(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn cbw(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.regs.get(&Regs::AX).unwrap().get_low();
     comp.regs.get_mut(&Regs::AX).unwrap().value = al as u16;
     0
 }
 
+//TODO: Test
 pub fn cdw(comp: &mut CPU, _: Instruction) -> usize {
     let ax = comp.regs.get(&Regs::AX).unwrap().value;
     comp.regs.get_mut(&Regs::DX).unwrap().value = if ax & 0x80 == 1 { 0xFF } else { 0x00 };
     0
 }
 
+//TODO: Test
 pub fn ldw(comp: &mut CPU, instruction: Instruction) -> usize {
     let value = match instruction.src.clone().unwrap().to_src_arg(comp) {
         Some(SrcArg::DWord(val)) => val,
@@ -35,6 +38,7 @@ pub fn ldw(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn xchg(comp: &mut CPU, instruction: Instruction) -> usize {
     let dst = instruction.dst.as_ref().unwrap();
     let src = instruction.src.as_ref().unwrap();
@@ -47,6 +51,7 @@ pub fn xchg(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn xlat(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.regs.get(&Regs::AX).unwrap().get_low() as u16;
     let src = DstArg::RegPtrImm(Regs::BX, al, Size::Byte).to_src_arg(comp).unwrap();
@@ -63,6 +68,7 @@ pub fn lea(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn lods(comp: &mut CPU, instruction: Instruction) -> usize {
     let src_loc = comp.regs.get(&Regs::SI).unwrap().value;
     let comp_dst = instruction.dst.unwrap();
@@ -88,6 +94,7 @@ pub fn lods(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn movs(comp: &mut CPU, instruction: Instruction) -> usize {
     let src_loc = comp.regs.get(&Regs::SI).unwrap().value;
     let dst_loc = comp.regs.get(&Regs::DI).unwrap().value;
@@ -119,6 +126,7 @@ pub fn movs(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn stos(comp: &mut CPU, instruction: Instruction) -> usize {
     let size = instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
     let dst = DstArg::RegPtr(Regs::DI, size);

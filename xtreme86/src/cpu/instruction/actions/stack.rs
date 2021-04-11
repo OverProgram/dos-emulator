@@ -14,6 +14,7 @@ pub fn push(comp: &mut CPU, instruction: Instruction) -> usize {
     1
 }
 
+//TODO: Test
 pub fn pusha(comp: &mut CPU, _: Instruction) -> usize {
     let tmp = comp.regs.get(&Regs::SP).unwrap().value;
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::AX)), 0b110);
@@ -34,6 +35,7 @@ pub fn pop(comp: &mut CPU, instruction: Instruction) -> usize {
     1
 }
 
+//TODO: Test
 pub fn popa(comp: &mut CPU, _: Instruction) -> usize {
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::DI)), 0);
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::SI)), 0);
@@ -46,6 +48,7 @@ pub fn popa(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn far_call(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::CS)), 0b110);
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::IP)), 0b110);
@@ -85,6 +88,7 @@ pub fn near_ret(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn far_ret(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::IP)), 0b000);
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::CS)), 0b000);

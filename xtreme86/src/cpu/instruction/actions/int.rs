@@ -41,6 +41,7 @@ pub fn iret(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn bound(comp: &mut CPU, instruction: Instruction) -> usize {
     if let Some(SrcArg::DWord(bounds)) = instruction.src.clone().unwrap().to_src_arg(comp) {
         match instruction.dst.clone().unwrap() {

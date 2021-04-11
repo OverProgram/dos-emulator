@@ -220,6 +220,7 @@ pub fn add(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn adc(comp: &mut CPU, instruction: Instruction) -> usize {
     let cf = (comp.read_reg(Regs::FLAGS).unwrap() & CPUFlags::CARRY) >> 0x01;
     let src = comp.operation_2_args(|src, _| src + (cf as u8), |src, _| src + cf);
@@ -253,6 +254,7 @@ pub fn sub(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn sbb(comp: &mut CPU, _: Instruction) -> usize {
     let cf = if comp.check_flag(CPUFlags::CARRY) { 1u8 } else { 0u8 };
     let src = comp.operation_2_args(|src, _| src + cf, |src, _| src + (cf as u16));
@@ -278,6 +280,7 @@ pub fn or(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn xor(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_2_args(|src, dst| dst ^ src, |src, dst| dst ^ src);
     comp.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
@@ -286,12 +289,14 @@ pub fn xor(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn not(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_1_arg(|dst| !dst, |dst| !dst);
     comp.write_to_arg(instruction.dst.clone().unwrap(), result).unwrap();
     0
 }
 
+//TODO: Test
 pub fn neg(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_1_arg(|dst| twos_compliment_byte(dst), |dst| twos_compliment_word(dst));
     comp.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
@@ -451,6 +456,7 @@ pub fn aaa(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn aad(comp: &mut CPU, instruction: Instruction) -> usize {
     if let Some(DstArg::Imm8(base)) = instruction.dst {
         let ax = comp.regs.get_mut(&Regs::AX).unwrap();
@@ -463,6 +469,7 @@ pub fn aad(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn aas(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.get_reg_8(0).unwrap();
 
@@ -480,6 +487,7 @@ pub fn aas(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn daa(comp: &mut CPU, _: Instruction) -> usize {
     let old_al = comp.regs.get(&Regs::AX).unwrap().get_low();
     let old_cf = comp.check_flag(CPUFlags::CARRY);
@@ -502,13 +510,14 @@ pub fn daa(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn ror(comp: &mut CPU, instruction: Instruction) -> usize {
     let res = comp.operation_2_args(|src, dst| rotate_right_byte(dst, src), |src, dst| rotate_right_word(dst, src));
     comp.write_to_arg(*instruction.dst.as_ref().unwrap(), res).unwrap();
     0
 }
 
-
+//TODO: Test
 pub fn rol(comp: &mut CPU, instruction: Instruction) -> usize {
     let res = comp.operation_2_args(|src, dst| rotate_left_byte(dst, src), |src, dst| rotate_left_word(dst, src));
     comp.write_to_arg(*instruction.dst.as_ref().unwrap(), res).unwrap();
@@ -523,6 +532,7 @@ fn get_times(src: SrcArg) -> u8 {
    }
 }
 
+//TODO: Test
 pub fn rcr(comp: &mut CPU, instruction: Instruction) -> usize {
     let carry = if comp.check_flag(CPUFlags::CARRY) { 1 } else { 0 };
     let times = get_times(instruction.src.as_ref().unwrap().to_src_arg(comp).unwrap());
@@ -553,6 +563,7 @@ pub fn rcr(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn rcl(comp: &mut CPU, instruction: Instruction) -> usize {
     let carry = if comp.check_flag(CPUFlags::CARRY) { 1 } else { 0 };
     let times = get_times(instruction.src.as_ref().unwrap().to_src_arg(comp).unwrap());
@@ -609,7 +620,7 @@ fn shift_get_times(comp: &mut CPU, instruction: &Instruction) -> u8 {
     }
 }
 
-
+//TODO: Test
 pub fn sal(comp: &mut CPU, instruction: Instruction) -> usize {
     let times = match instruction.src.unwrap().to_src_arg(comp).unwrap() {
         SrcArg::Byte(times) => if times == 1 {
@@ -636,6 +647,7 @@ pub fn sal(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn shr(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.set_flag(CPUFlags::OVERFLOW);
 
@@ -669,6 +681,7 @@ fn arithmetic_right_shift_byte(arg: u8, times: u8) -> u8 {
     res
 }
 
+//TODO: Test
 pub fn sar(comp: &mut CPU, instruction: Instruction) -> usize {
     if CPU::check_src_arg(&instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap(),
                           |dst| dst & 0x80 != 0, |dst| dst & 0x8000 != 0) {

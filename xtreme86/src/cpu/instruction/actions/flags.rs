@@ -46,6 +46,7 @@ pub fn cmp(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn test(comp: &mut CPU, _: Instruction) -> usize {
     let res = comp.operation_2_args(|src, dst| src & dst, |src, dst| src & dst);
     comp.check_flags_in_result(&res, CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::PARITY);
@@ -54,6 +55,7 @@ pub fn test(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn cmps(comp: &mut CPU, instruction: Instruction) -> usize {
     let ptr2 = comp.regs.get(&Regs::DI).unwrap().value;
     comp.instruction.as_mut().map(|mut s| { s.segment = Regs::ES });
@@ -80,6 +82,7 @@ pub fn cmps(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn scas(comp: &mut CPU, instruction: Instruction) -> usize {
     let size = instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
     let src_dst = DstArg::RegPtr(Regs::DI, size);
@@ -104,18 +107,21 @@ pub fn scas(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+//TODO: Test
 pub fn lahf(comp: &mut CPU, _: Instruction) -> usize {
     let new_ah = comp.regs.get(&Regs::FLAGS).unwrap().get_low();
     comp.regs.get_mut(&Regs::AX).unwrap().set_low(new_ah);
     0
 }
 
+//TODO: Test
 pub fn sahf(comp: &mut CPU, _: Instruction) -> usize {
     let new_flags= comp.regs.get(&Regs::AX).unwrap().get_low();
     comp.regs.get_mut(&Regs::FLAGS).unwrap().set_low(new_flags);
     0
 }
 
+//TODO: Test
 pub fn rep(comp: &mut CPU, instruction: Instruction) -> usize {
     let cmp;
     let op = match instruction.dst.as_ref().unwrap() {
@@ -150,6 +156,7 @@ pub fn rep_mnemonic(instruction: Instruction) -> String {
     }.to_string()
 }
 
+//TODO: Test
 pub fn repne(comp: &mut CPU, instruction: Instruction) -> usize {
     let op = match instruction.dst.as_ref().unwrap() {
         DstArg::Opcode(opcode) => match opcode {
