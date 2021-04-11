@@ -280,6 +280,7 @@ pub fn or(comp: &mut CPU, instruction: Instruction) -> usize {
 pub fn xor(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_2_args(|src, dst| dst ^ src, |src, dst| dst ^ src);
     comp.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
+    comp.clear_flag(CPUFlags::OVERFLOW | CPUFlags::CARRY);
     comp.write_to_arg(instruction.dst.clone().unwrap(), result).unwrap();
     0
 }
