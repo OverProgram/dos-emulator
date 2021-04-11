@@ -14,7 +14,22 @@ pub fn cld(comp: &mut CPU, _: Instruction) -> usize {
 }
 
 pub fn cli(comp: &mut CPU, _: Instruction) -> usize {
-    comp.clear_flag(CPUFlags::INTERRUPT);
+    comp.set_flag(CPUFlags::INTERRUPT);
+    0
+}
+
+pub fn stc(comp: &mut CPU, _: Instruction) -> usize {
+    comp.set_flag(CPUFlags::CARRY);
+    0
+}
+
+pub fn std(comp: &mut CPU, _: Instruction) -> usize {
+    comp.set_flag(CPUFlags::DIRECTION);
+    0
+}
+
+pub fn sti(comp: &mut CPU, _: Instruction) -> usize {
+    comp.set_flag(CPUFlags::INTERRUPT);
     0
 }
 
@@ -52,6 +67,23 @@ pub fn cmps(comp: &mut CPU, instruction: Instruction) -> usize {
         comp.regs.get_mut(&Regs::DI).unwrap().value -= 1;
         comp.regs.get_mut(&Regs::SI).unwrap().value -= 1;
     };
+    0
+}
+
+pub fn scas(comp: &mut CPU, instruction: Instruction) -> usize {
+    let src_dst = DstArg::RegPtr(Regs::DI, instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size());
+    let src = src_dst.to_src_arg(comp).unwrap();
+    comp.check_carry_sub(src);
+    comp.instruction.as_mut().map(move |s| s.src = Some(src_dst));
+    let dif = comp.operation_2_args(|src, dst| sub_with_carry_8_bit(dst, src), |src, dst| sub_with_carry_16_bit(dst,src));
+    comp.check_flags_in_result(&dif, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
+
+    if comp.check_flag(CPUFlags::DIRECTION) {
+        comp.regs.get_mut(&Regs::DI).unwrap().value += 1;
+    } else {
+        comp.regs.get_mut(&Regs::DI).unwrap().value -= 1;
+    };
+
     0
 }
 
