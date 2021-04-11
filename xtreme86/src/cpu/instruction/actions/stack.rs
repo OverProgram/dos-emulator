@@ -2,19 +2,10 @@ use crate::cpu::{CPU, Regs};
 use crate::cpu::instruction::args::{SrcArg, DstArg, Size};
 use crate::cpu::instruction::Instruction;
 
-fn sign_extend(num: u8) -> u16 {
-    let sign_bit = (num >> 7) as u16;
-    let mut new_num = num as u16;
-    for i in 0..8 {
-        new_num |= sign_bit << i;
-    }
-    new_num
-}
-
 pub fn push(comp: &mut CPU, instruction: Instruction) -> usize {
     let tmp_arg = instruction.dst.clone().unwrap().to_src_arg(comp).unwrap();
     let arg = match tmp_arg {
-        SrcArg::Byte(val) => SrcArg::Word(sign_extend(val)),
+        SrcArg::Byte(val) => SrcArg::Word(CPU::sign_extend(val)),
         arg => arg
     };
     comp.instruction.as_mut().map(|mut s| { s.segment = Regs::SS });

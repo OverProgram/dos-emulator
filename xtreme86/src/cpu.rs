@@ -706,14 +706,23 @@ impl CPU {
     //     (self.read_ip_mut() as u16) | ((self.read_ip_mut() as u16) << 8)
     // }
 
+    fn sign_extend(num: u8) -> u16 {
+        let sign_bit = (num >> 7) as u16;
+        let mut new_num = num as u16;
+        for i in 0..8 {
+            new_num |= sign_bit << i;
+        }
+        new_num
+    }
+
     fn write_to_arg(&mut self, arg: DstArg, val_arg: SrcArg) -> Result<(), &str> {
         match arg {
             DstArg::Reg16(reg) => {
-                self.regs.get_mut(&Regs::translate_reg16(reg).unwrap()).unwrap().value = if let SrcArg::Word(value) = val_arg {
-                    value
-                    } else {
-                        return Err("Mismatch operand sizes");
-                    };
+                self.regs.get_mut(&Regs::translate_reg16(reg).unwrap()).unwrap().value = match val_arg {
+                    SrcArg::Byte(val) => Self::sign_extend(val),
+                    SrcArg::Word(val) => val,
+                    _ => panic!("invalid operand sizes")
+                };
                 Ok(())
             },
             DstArg::Reg8(reg_num) => {
@@ -722,7 +731,7 @@ impl CPU {
                 let value = if let SrcArg::Byte(val) = val_arg {
                     val
                 } else {
-                    return Err("Mismatch operand sizes");
+                    panic!("invalid operand sizes")
                 };
                 match part {
                     WordPart::Low => { reg.set_low(value) },
@@ -732,8 +741,9 @@ impl CPU {
             },
             DstArg::Reg(reg) => {
                 self.regs.get_mut(&reg).unwrap().value = match val_arg {
+                    SrcArg::Byte(val) => Self::sign_extend(val),
                     SrcArg::Word(val) => val,
-                    _ => return Err("Mismatch operand sizes")
+                    _ => panic!("invalid operand sizes")
                 };
                 Ok(())
             },
