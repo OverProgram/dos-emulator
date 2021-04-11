@@ -159,7 +159,6 @@ pub fn alu_dispatch_one_arg_mnemonic(instruction: Instruction) -> String {
     })
 }
 
-//TODO: check mul, div, imul, idiv, and correctness in generation script
 pub fn mul_dispatch(comp: &mut CPU, instruction: Instruction) -> usize {
     match comp.instruction.clone().unwrap().reg_bits {
         0b000 => test(comp, instruction),
@@ -266,6 +265,7 @@ pub fn sbb(comp: &mut CPU, _: Instruction) -> usize {
 pub fn and(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_2_args(|src, dst| dst & src, |src, dst| dst & src);
     comp.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
+    comp.clear_flag(CPUFlags::OVERFLOW | CPUFlags::CARRY);
     comp.write_to_arg(instruction.dst.clone().unwrap(), result).unwrap();
     0
 }
@@ -273,6 +273,7 @@ pub fn and(comp: &mut CPU, instruction: Instruction) -> usize {
 pub fn or(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_2_args(|src, dst| dst | src, |src, dst| dst | src);
     comp.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
+    comp.clear_flag(CPUFlags::OVERFLOW | CPUFlags::CARRY);
     comp.write_to_arg(instruction.dst.clone().unwrap(), result).unwrap();
     0
 }

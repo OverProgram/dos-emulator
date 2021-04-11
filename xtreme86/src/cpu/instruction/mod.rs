@@ -90,6 +90,7 @@ pub struct InstructionDecoder<'a> {
     opcode_data: Option<Opcode>,
     s: u8,
     d: u8,
+    code: u8,
     instruction: Instruction
 }
 
@@ -103,13 +104,14 @@ impl<'a> InstructionDecoder<'a> {
             opcode_data: None,
             s: 0,
             d: 0,
-
+            code: 0,
             instruction: Instruction::new()
         }
     }
 
     pub fn get(mut self) -> Instruction {
         let code = self.read_ip();
+        self.code = code;
         let opcode_data = match self.get_opcode(code) {
             Some(op) => op,
             None => return self.instruction
@@ -208,7 +210,7 @@ impl<'a> InstructionDecoder<'a> {
     }
 
     fn get_two_args(&mut self) {
-        let immediate = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::Immediate);
+        let mut immediate = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::Immediate);
         let force_dword = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceDWord);
         let force_word = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceWord);
         let force_byte =self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceByte);
@@ -216,6 +218,11 @@ impl<'a> InstructionDecoder<'a> {
         let mod_reg_rm = self.read_ip();
         let (mod_bits, reg_bits, rm_bits) = Self::get_mod_reg_rm_bits(mod_reg_rm);
         self.instruction.reg_bits = reg_bits;
+
+        // Special case for TEST in mul_dispatch, because it needs an immediate while others don't
+        if self.code & 0x01 == 0xF6 && reg_bits == 0x00 {
+            immediate = true;
+        }
 
         let arg2 = if let None = self.instruction.src {
             Some(self.translate_mod_rm(mod_bits, rm_bits))
