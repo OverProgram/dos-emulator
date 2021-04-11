@@ -98,6 +98,29 @@ pub fn movs(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+pub fn stos(comp: &mut CPU, instruction: Instruction) -> usize {
+    let size = instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
+    let dst = DstArg::RegPtr(Regs::DI, size);
+    let src = DstArg::Reg(Regs::AX).to_src_arg(comp).unwrap();
+
+    comp.write_to_arg(dst, src).unwrap();
+
+    let advance = match size {
+        Size::Byte => 1,
+        Size::Word => 2,
+        _ => panic!("stos can only accept byte or word")
+    };
+
+
+    if comp.check_flag(CPUFlags::DIRECTION) {
+        comp.regs.get_mut(&Regs::DI).unwrap().value += advance;
+    } else  {
+        comp.regs.get_mut(&Regs::DI).unwrap().value -= advance;
+    }
+
+    0
+}
+
 pub fn nop(_: &mut CPU, _: Instruction) -> usize {
                              0
                               }

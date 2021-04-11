@@ -1,6 +1,6 @@
 use crate::cpu::{CPU, CPUFlags, Regs};
 use crate::cpu::instruction::actions::alu::{sub_with_carry_8_bit, sub_with_carry_16_bit};
-use crate::cpu::instruction::args::{SrcArg, DstArg};
+use crate::cpu::instruction::args::{SrcArg, DstArg, Size};
 use crate::cpu::instruction::Instruction;
 
 pub fn clc(comp: &mut CPU, _: Instruction) -> usize {
@@ -50,38 +50,47 @@ pub fn cmps(comp: &mut CPU, instruction: Instruction) -> usize {
     let ptr2 = comp.regs.get(&Regs::DI).unwrap().value;
     comp.instruction.as_mut().map(|mut s| { s.segment = Regs::ES });
     let src_as_dst = instruction.src.clone().unwrap();
-    let src = match src_as_dst.to_src_arg(comp).unwrap() {
-        SrcArg::Byte(_) => SrcArg::Byte(comp.read_mem_byte_mut(ptr2).unwrap()),
-        SrcArg::Word(_) => SrcArg::Word(comp.read_mem_word_mut(ptr2).unwrap()),
-        SrcArg::DWord(_) => SrcArg::DWord(comp.read_mem_dword_mut(ptr2).unwrap())
+    let (src, advance) = match src_as_dst.to_src_arg(comp).unwrap() {
+        SrcArg::Byte(_) => (SrcArg::Byte(comp.read_mem_byte_mut(ptr2).unwrap()), 1),
+        SrcArg::Word(_) => (SrcArg::Word(comp.read_mem_word_mut(ptr2).unwrap()), 2),
+        _ => panic!("cmps can only accept byte or word")
     };
 
     comp.instruction.as_mut().map(|mut s| { s.segment = Regs::DS; s.src = Some(src_as_dst) });
     comp.check_carry_sub(src);
     let dif = comp.operation_2_args(|src, dst| sub_with_carry_8_bit(dst, src), |src, dst| sub_with_carry_16_bit(dst, src));
     comp.check_flags_in_result(&dif, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
+
     if comp.check_flag(CPUFlags::DIRECTION) {
-        comp.regs.get_mut(&Regs::DI).unwrap().value += 1;
-        comp.regs.get_mut(&Regs::SI).unwrap().value += 1;
+        comp.regs.get_mut(&Regs::DI).unwrap().value += advance;
+        comp.regs.get_mut(&Regs::SI).unwrap().value += advance;
     } else {
-        comp.regs.get_mut(&Regs::DI).unwrap().value -= 1;
-        comp.regs.get_mut(&Regs::SI).unwrap().value -= 1;
+        comp.regs.get_mut(&Regs::DI).unwrap().value -= advance;
+        comp.regs.get_mut(&Regs::SI).unwrap().value -= advance;
     };
+
     0
 }
 
 pub fn scas(comp: &mut CPU, instruction: Instruction) -> usize {
-    let src_dst = DstArg::RegPtr(Regs::DI, instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size());
+    let size = instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
+    let src_dst = DstArg::RegPtr(Regs::DI, size);
     let src = src_dst.to_src_arg(comp).unwrap();
     comp.check_carry_sub(src);
     comp.instruction.as_mut().map(move |s| s.src = Some(src_dst));
     let dif = comp.operation_2_args(|src, dst| sub_with_carry_8_bit(dst, src), |src, dst| sub_with_carry_16_bit(dst,src));
     comp.check_flags_in_result(&dif, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);
 
+    let advance = match size {
+        Size::Word => 2,
+        Size::Byte => 1,
+        _ => panic!("scas can only accept byte or word")
+    };
+
     if comp.check_flag(CPUFlags::DIRECTION) {
-        comp.regs.get_mut(&Regs::DI).unwrap().value += 1;
+        comp.regs.get_mut(&Regs::DI).unwrap().value += advance;
     } else {
-        comp.regs.get_mut(&Regs::DI).unwrap().value -= 1;
+        comp.regs.get_mut(&Regs::DI).unwrap().value -= advance;
     };
 
     0
