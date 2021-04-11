@@ -133,7 +133,7 @@ def make_opcodes():
         0xAB: Opcode(Opcode.NUM_ARGS_ZERO, Function('stos', 'mem'), 'stosw', shorthand1='Word(0)',
                      segment=Opcode.SEG_ES),
         0x98: Opcode(Opcode.NUM_ARGS_ZERO, Function('cbw', 'mem'), 'cbw'),
-        0x99: Opcode(Opcode.NUM_ARGS_ZERO, Function('cdw', 'mem'), 'cbw'),
+        0x99: Opcode(Opcode.NUM_ARGS_ZERO, Function('cwd', 'mem'), 'cwd'),
         0x80: Opcode(Opcode.NUM_ARGS_TWO, Function('alu_dispatch_two_args', 'alu'),
                      Function('alu_dispatch_two_args_mnemonic', 'alu'), flags=(Opcode.FLAG_IMMEDIATE,)),
         0x83: Opcode(Opcode.NUM_ARGS_TWO, Function('alu_dispatch_two_args', 'alu'),

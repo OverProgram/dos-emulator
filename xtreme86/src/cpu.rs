@@ -709,7 +709,7 @@ impl CPU {
     fn sign_extend(num: u8) -> u16 {
         let sign_bit = (num >> 7) as u16;
         let mut new_num = num as u16;
-        for i in 0..8 {
+        for i in 8..16 {
             new_num |= sign_bit << i;
         }
         new_num

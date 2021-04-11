@@ -163,7 +163,7 @@ impl Opcode {
 			Some(Opcode{ num_args: NumArgs::Two, action: Rc::new(mem::xchg), mnemonic: Mnemonic::Static(String::from("xchg")), shorthand1: Some(Placeholder::Reg16(0)), shorthand2: Some(Placeholder::Reg16(6)), flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::Two, action: Rc::new(mem::xchg), mnemonic: Mnemonic::Static(String::from("xchg")), shorthand1: Some(Placeholder::Reg16(0)), shorthand2: Some(Placeholder::Reg16(7)), flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(mem::cbw), mnemonic: Mnemonic::Static(String::from("cbw")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
-			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(mem::cdw), mnemonic: Mnemonic::Static(String::from("cbw")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
+			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(mem::cwd), mnemonic: Mnemonic::Static(String::from("cwd")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::One, action: Rc::new(stack::far_call), mnemonic: Mnemonic::Static(String::from("call")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ ForceWord | Immediate }), segment: Regs::DS }),
 			None,
 			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(stack::push), mnemonic: Mnemonic::Static(String::from("pushf")), shorthand1: Some(Placeholder::RegEnum(Regs::FLAGS)), shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),

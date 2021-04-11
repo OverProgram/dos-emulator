@@ -9,17 +9,15 @@ pub fn mov(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn cbw(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.regs.get(&Regs::AX).unwrap().get_low();
-    comp.regs.get_mut(&Regs::AX).unwrap().value = al as u16;
+    comp.regs.get_mut(&Regs::AX).unwrap().value = CPU::sign_extend(al);
     0
 }
 
-//TODO: Test
-pub fn cdw(comp: &mut CPU, _: Instruction) -> usize {
+pub fn cwd(comp: &mut CPU, _: Instruction) -> usize {
     let ax = comp.regs.get(&Regs::AX).unwrap().value;
-    comp.regs.get_mut(&Regs::DX).unwrap().value = if ax & 0x80 == 1 { 0xFF } else { 0x00 };
+    comp.regs.get_mut(&Regs::DX).unwrap().value = if ax >> 15 == 1 { 0xFFFF } else { 0x0000 };
     0
 }
 

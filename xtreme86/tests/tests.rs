@@ -65,10 +65,14 @@ mod mov_test {
     }
 
     #[test]
-    fn test_lea() {
+    fn test_lea_convert() {
         let mut comp = new_cpu_from_file("obj/lea.out");
         comp.run_to_nop(0);
         assert_eq!(comp.read_reg(Regs::AX).unwrap(), 9);
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0xFFFF);
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::DX).unwrap(), 0xFFFF);
     }
 }
 
