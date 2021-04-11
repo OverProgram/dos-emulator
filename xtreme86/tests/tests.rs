@@ -278,5 +278,7 @@ mod test_flags {
         let mut comp = new_cpu_from_file("obj/cmp.out");
         comp.run_to_nop(0);
         assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x30);
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x30);
     }
 }

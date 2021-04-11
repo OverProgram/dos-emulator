@@ -46,7 +46,6 @@ pub fn cmp(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn test(comp: &mut CPU, _: Instruction) -> usize {
     let res = comp.operation_2_args(|src, dst| src & dst, |src, dst| src & dst);
     comp.check_flags_in_result(&res, CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::PARITY);

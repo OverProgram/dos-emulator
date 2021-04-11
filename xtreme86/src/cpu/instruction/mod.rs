@@ -109,13 +109,10 @@ impl<'a> InstructionDecoder<'a> {
         }
     }
 
-    pub fn get(mut self) -> Instruction {
+    pub fn get(mut self) -> Option<Instruction>{
         let code = self.read_ip();
         self.code = code;
-        let opcode_data = match self.get_opcode(code) {
-            Some(op) => op,
-            None => return self.instruction
-        };
+        let opcode_data = self.get_opcode(code)?;
 
         self.instruction.flags = opcode_data.flags;
         self.instruction.action = Some(opcode_data.action.clone());
@@ -138,7 +135,7 @@ impl<'a> InstructionDecoder<'a> {
 
         self.instruction.length = self.ip;
 
-        self.instruction
+        Some(self.instruction)
     }
 
     fn get_opcode(&self, code: u8) -> Option<Opcode> {
@@ -201,6 +198,23 @@ impl<'a> InstructionDecoder<'a> {
         }
     }
 
+    fn get_imm(&mut self) -> DstArg {
+        let size_mismatch = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::SizeMismatch);
+        let force_dword = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceDWord);
+        let force_word = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceWord);
+        let force_byte =self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceByte);
+
+        if force_dword {
+            DstArg::Imm32(self.read_ip_dword())
+        } else if ((self.s == 1 && !size_mismatch)
+            || force_word) &&
+            !force_byte {
+            DstArg::Imm16(self.read_ip_word())
+        } else {
+            DstArg::Imm8(self.read_ip())
+        }
+    }
+
     fn get_args(&mut self) {
         match self.opcode_data.clone().unwrap().num_args {
             NumArgs::Two => if !self.opcode_data.as_ref().unwrap().has_shorthand() { self.get_two_args() },
@@ -210,19 +224,12 @@ impl<'a> InstructionDecoder<'a> {
     }
 
     fn get_two_args(&mut self) {
-        let mut immediate = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::Immediate);
+        let immediate = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::Immediate);
         let force_dword = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceDWord);
-        let force_word = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceWord);
-        let force_byte =self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceByte);
 
         let mod_reg_rm = self.read_ip();
         let (mod_bits, reg_bits, rm_bits) = Self::get_mod_reg_rm_bits(mod_reg_rm);
         self.instruction.reg_bits = reg_bits;
-
-        // Special case for TEST in mul_dispatch, because it needs an immediate while others don't
-        if self.code & 0x01 == 0xF6 && reg_bits == 0x00 {
-            immediate = true;
-        }
 
         let arg2 = if let None = self.instruction.src {
             Some(self.translate_mod_rm(mod_bits, rm_bits))
@@ -231,15 +238,7 @@ impl<'a> InstructionDecoder<'a> {
         };
 
         let arg1 = if immediate {
-            if force_dword {
-                DstArg::Imm32(self.read_ip_dword())
-            } else if ((self.s == 1 && !self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::SizeMismatch))
-                || force_word) &&
-                !force_byte {
-                DstArg::Imm16(self.read_ip_word())
-            } else {
-                DstArg::Imm8(self.read_ip())
-            }
+            self.get_imm()
         } else if force_dword {
             DstArg::Ptr(self.read_ip_word(), Size::DWord)
         } else {
@@ -269,6 +268,7 @@ impl<'a> InstructionDecoder<'a> {
         let force_word = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceWord);
         let force_byte = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceByte);
 
+
         if let None = self.instruction.clone().dst {
             if immediate {
                 let new_dst = if force_dword {
@@ -283,6 +283,12 @@ impl<'a> InstructionDecoder<'a> {
                 let mod_reg_rm = self.read_ip();
                 let (mod_bits, reg_bits, rm_bits) = Self::get_mod_reg_rm_bits(mod_reg_rm);
                 self.instruction.reg_bits = reg_bits;
+
+                // Special case for TEST in mul_dispatch, because it needs an immediate while others don't
+                if self.code & 0xFE == 0xF6 && reg_bits == 0x00 {
+                    let src = self.get_imm();
+                    self.instruction.src = Some(src);
+                }
 
                 let new_dst = self.translate_mod_rm(mod_bits, rm_bits);
                 self.instruction.dst.replace(new_dst);
