@@ -231,7 +231,9 @@ impl<'a> InstructionDecoder<'a> {
         let (mod_bits, reg_bits, rm_bits) = Self::get_mod_reg_rm_bits(mod_reg_rm);
         self.instruction.reg_bits = reg_bits;
 
-        let arg2 = if let None = self.instruction.src {
+        let arg2 = if force_dword {
+            Some(DstArg::Reg16(reg_bits))
+        } else if let None = self.instruction.src {
             Some(self.translate_mod_rm(mod_bits, rm_bits))
         } else {
             None

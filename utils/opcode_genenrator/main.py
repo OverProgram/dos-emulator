@@ -226,6 +226,7 @@ def make_opcodes():
                      flags=(Opcode.FLAG_IMMEDIATE, Opcode.FLAG_FORCE_BYTE)),
         0xCC: Opcode(Opcode.NUM_ARGS_ONE, Function('int_req', 'int'), 'int',
                      flags=(Opcode.FLAG_IMMEDIATE, Opcode.FLAG_FORCE_BYTE), shorthand1='Byte(3)'),
+        0xCE: Opcode(Opcode.NUM_ARGS_ZERO, Function('into', 'int'), 'into'),
         0xCF: Opcode(Opcode.NUM_ARGS_ZERO, Function('iret', 'int'), 'int'),
         0x62: Opcode(Opcode.NUM_ARGS_TWO, Function('bound', 'int'), 'bound', flags=(Opcode.FLAG_FORCE_DWORD,))
     }

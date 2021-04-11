@@ -216,7 +216,7 @@ impl Opcode {
 			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(stack::far_ret), mnemonic: Mnemonic::Static(String::from("ret")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::One, action: Rc::new(int::int_req), mnemonic: Mnemonic::Static(String::from("int")), shorthand1: Some(Placeholder::Byte(3)), shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ Immediate | ForceByte }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::One, action: Rc::new(int::int_req), mnemonic: Mnemonic::Static(String::from("int")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ Immediate | ForceByte }), segment: Regs::DS }),
-			None,
+			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(int::into), mnemonic: Mnemonic::Static(String::from("into")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::Zero, action: Rc::new(int::iret), mnemonic: Mnemonic::Static(String::from("int")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: Regs::DS }),
 			Some(Opcode{ num_args: NumArgs::Two, action: Rc::new(alu::rotate_dispatch), mnemonic: Mnemonic::Dynamic(Rc::new(alu::rotate_dispatch_mnemonic)), shorthand1: None, shorthand2: Some(Placeholder::Byte(1)), flags: make_bitflags!(OpcodeFlags::{ SizeMismatch }), segment: Regs::DS }),
 			None,

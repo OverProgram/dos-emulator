@@ -1,4 +1,4 @@
-use crate::cpu::{CPU, Regs, exceptions};
+use crate::cpu::{CPU, Regs, exceptions, CPUFlags};
 use crate::cpu::instruction::args::{SrcArg, DstArg};
 use crate::cpu::instruction::Instruction;
 
@@ -31,6 +31,13 @@ pub fn int(comp: &mut CPU) -> usize {
     comp.write_to_arg(DstArg::Reg(Regs::IP), SrcArg::Word(new_ip)).unwrap();
 
     comp.set_reg(Regs::ES, tmp_es);
+    0
+}
+
+pub fn into(comp: &mut CPU, _: Instruction) -> usize {
+    if comp.check_flag(CPUFlags::OVERFLOW) {
+        comp.sub_command(0xCD, None, Some(DstArg::Imm8(3)), 0);
+    }
     0
 }
 
