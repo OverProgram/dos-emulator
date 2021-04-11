@@ -111,7 +111,6 @@ pub fn cmps(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn scas(comp: &mut CPU, instruction: Instruction) -> usize {
     let size = instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
     let src_dst = DstArg::RegPtr(Regs::DI, size);

@@ -291,7 +291,7 @@ mod test_string {
     fn test_string() {
         let mut comp = new_cpu_from_file("obj/str.out");
         let str1 = "Hello, world!".to_string().into_bytes();
-        let str2 = "Hello, aayal".to_string().into_bytes();
+        let str2 = "Hello, aayal!".to_string().into_bytes();
 
         comp.write_bytes_ds(0, str1).unwrap();
         comp.write_bytes_es(0, str2).unwrap();
@@ -300,5 +300,8 @@ mod test_string {
         assert_eq!(comp.read_reg(Regs::AX).unwrap(), 20);
         assert_eq!(comp.read_reg(Regs::SI).unwrap(), 8);
         assert_eq!(comp.read_reg(Regs::DI).unwrap(), 8);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::DI).unwrap(), 0);
     }
 }

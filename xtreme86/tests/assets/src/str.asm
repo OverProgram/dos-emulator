@@ -9,3 +9,10 @@ lop_cmps:
     je lop_cmps
     mov ax, 20
     nop
+
+    mov al, 'e'
+    std
+lop_scas:
+    scasb
+    jne lop_scas
+    nop
