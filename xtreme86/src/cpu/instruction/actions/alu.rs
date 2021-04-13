@@ -220,9 +220,8 @@ pub fn add(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn adc(comp: &mut CPU, instruction: Instruction) -> usize {
-    let cf = (comp.read_reg(Regs::FLAGS).unwrap() & CPUFlags::CARRY) >> 0x01;
+    let cf = if comp.check_flag(CPUFlags::CARRY) { 1 } else { 0 };
     let src = comp.operation_2_args(|src, _| src + (cf as u8), |src, _| src + cf);
     comp.check_carry_add(src.clone());
     let sum = match src {
@@ -254,13 +253,13 @@ pub fn sub(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
-pub fn sbb(comp: &mut CPU, _: Instruction) -> usize {
+pub fn sbb(comp: &mut CPU, instruction: Instruction) -> usize {
     let cf = if comp.check_flag(CPUFlags::CARRY) { 1u8 } else { 0u8 };
     let src = comp.operation_2_args(|src, _| src + cf, |src, _| src + (cf as u16));
     comp.check_carry_sub(src);
     let res = comp.operation_2_args(|src, dst| dst - (src + cf), |src, dst| dst - (src + (cf as u16)));
     comp.check_flags_in_result(&res, CPUFlags::PARITY | CPUFlags::ZERO | CPUFlags::SIGN | CPUFlags::AUX_CARRY);
+    comp.write_to_arg(instruction.dst.unwrap(), res).unwrap();
     0
 }
 
@@ -280,7 +279,6 @@ pub fn or(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn xor(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_2_args(|src, dst| dst ^ src, |src, dst| dst ^ src);
     comp.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO);
@@ -289,14 +287,12 @@ pub fn xor(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn not(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_1_arg(|dst| !dst, |dst| !dst);
     comp.write_to_arg(instruction.dst.clone().unwrap(), result).unwrap();
     0
 }
 
-//TODO: Test
 pub fn neg(comp: &mut CPU, instruction: Instruction) -> usize {
     let result = comp.operation_1_arg(|dst| twos_compliment_byte(dst), |dst| twos_compliment_word(dst));
     comp.check_flags_in_result(&result, CPUFlags::PARITY | CPUFlags::SIGN | CPUFlags::ZERO | CPUFlags::AUX_CARRY);

@@ -205,6 +205,22 @@ mod test_alu {
         assert_eq!(computer.read_reg(Regs::BX).unwrap() & 0xFF, 9);
         computer.run_to_nop_from_ip();
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x02);
+
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 11);
+
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0);
+
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0xFF00);
+
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x00FF);
+
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x0001);
+
     }
 }
 
