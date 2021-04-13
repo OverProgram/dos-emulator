@@ -14,7 +14,6 @@ pub fn push(comp: &mut CPU, instruction: Instruction) -> usize {
     1
 }
 
-//TODO: Test
 pub fn pusha(comp: &mut CPU, _: Instruction) -> usize {
     let tmp = comp.regs.get(&Regs::SP).unwrap().value;
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::AX)), 0b110);
@@ -35,7 +34,6 @@ pub fn pop(comp: &mut CPU, instruction: Instruction) -> usize {
     1
 }
 
-//TODO: Test
 pub fn popa(comp: &mut CPU, _: Instruction) -> usize {
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::DI)), 0);
     comp.sub_command(0x8F, None, Some(DstArg::Reg(Regs::SI)), 0);
