@@ -28,3 +28,18 @@ CPU 286
 
     neg al
     nop
+
+    mov ax, 0x0A0E
+    aad
+    nop
+
+    mov ax, 0x0105
+    sub al, 0x0A
+    aas
+    nop
+
+    mov al, 0x79
+    mov bl, 0x35
+    add al, bl
+    daa
+    nop

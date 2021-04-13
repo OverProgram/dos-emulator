@@ -452,7 +452,6 @@ pub fn aaa(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn aad(comp: &mut CPU, instruction: Instruction) -> usize {
     if let Some(DstArg::Imm8(base)) = instruction.dst {
         let ax = comp.regs.get_mut(&Regs::AX).unwrap();
@@ -465,15 +464,16 @@ pub fn aad(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn aas(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.get_reg_8(0).unwrap();
 
     if (al & 0xF) > 9 || comp.check_flag(CPUFlags::AUX_CARRY) {
         let ax = comp.regs.get_mut(&Regs::AX).unwrap();
-        let ah = ax.get_low();
-        ax.set_low(al - 6);
+        let ah = ax.get_high();
+        ax.value -= 6;
         ax.set_high(ah - 1);
+        let al = ax.get_low();
+        ax.set_low(al & 0x0F);
         comp.set_flag(CPUFlags::AUX_CARRY);
         comp.set_flag(CPUFlags::CARRY);
     } else {
@@ -483,7 +483,6 @@ pub fn aas(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn daa(comp: &mut CPU, _: Instruction) -> usize {
     let old_al = comp.regs.get(&Regs::AX).unwrap().get_low();
     let old_cf = comp.check_flag(CPUFlags::CARRY);
