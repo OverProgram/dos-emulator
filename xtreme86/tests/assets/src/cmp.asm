@@ -1,5 +1,7 @@
 CPU 286
 
+ORG 0x103F0
+
     mov ax, 9
     mov dx, 9
     cmp ax, dx
