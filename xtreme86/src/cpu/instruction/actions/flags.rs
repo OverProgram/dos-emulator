@@ -154,9 +154,12 @@ pub fn rep(comp: &mut CPU, instruction: Instruction) -> usize {
         },
         _ => panic!("rep only accepts string operation opcodes")
     };
-    while comp.regs.get(&Regs::CX).unwrap().value != 0 && if cmp { !comp.check_flag(CPUFlags::ZERO) } else { true } {
-        comp.sub_command(op, instruction.src.clone(), instruction.dst.clone(), 0);
+    loop {
+        comp.do_opcode(op);
         comp.regs.get_mut(&Regs::CX).unwrap().value -= 1;
+        if comp.regs.get(&Regs::CX).unwrap().value != 0 && if cmp { !comp.check_flag(CPUFlags::ZERO) } else { true } {
+            break;
+        }
     }
     0
 }
@@ -181,9 +184,12 @@ pub fn repne(comp: &mut CPU, instruction: Instruction) -> usize {
         },
         _ => panic!("repne only accepts string comparison opcodes")
     };
-    while comp.regs.get(&Regs::CX).unwrap().value != 0 || comp.check_flag(CPUFlags::ZERO) {
-        comp.sub_command(op, instruction.src.clone(), instruction.dst.clone(), 0);
+    loop {
+        comp.do_opcode(op);
         comp.regs.get_mut(&Regs::CX).unwrap().value -= 1;
+        if comp.regs.get(&Regs::CX).unwrap().value != 0 || comp.check_flag(CPUFlags::ZERO) {
+            break;
+        }
     }
     0
 }

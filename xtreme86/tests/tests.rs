@@ -328,7 +328,7 @@ mod test_flags {
 
 mod test_string {
     use crate::new_cpu_from_file;
-    use xtreme86::cpu::Regs;
+    use xtreme86::cpu::{Regs, CPU};
 
     #[test]
     fn test_string() {
@@ -346,5 +346,24 @@ mod test_string {
 
         comp.run_to_nop_from_ip();
         assert_eq!(comp.read_reg(Regs::DI).unwrap(), 0);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x726F);
+
+        comp.run_to_nop_from_ip();
+        let address_ds = CPU::physical_address(comp.read_reg(Regs::DS).unwrap(), 7);
+        let address_es = CPU::physical_address(comp.read_reg(Regs::ES).unwrap(), 7);
+
+        let val_ds = comp.probe_mem(address_ds as usize);
+
+        assert_eq!(comp.probe_mem(address_es as usize), val_ds);
+
+        comp.run_to_nop_from_ip();
+        let address_es_new = address_es + 1;
+        assert_eq!(comp.probe_mem_word(address_es_new as usize), 0x706F);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::SI).unwrap(), 8);
+        assert_eq!(comp.read_reg(Regs::DI).unwrap(), 8);
     }
 }

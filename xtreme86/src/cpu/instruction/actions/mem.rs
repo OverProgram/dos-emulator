@@ -73,7 +73,6 @@ pub fn lea(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn lods(comp: &mut CPU, instruction: Instruction) -> usize {
     let src_loc = comp.regs.get(&Regs::SI).unwrap().value;
     let comp_dst = instruction.dst.unwrap();
@@ -97,7 +96,6 @@ pub fn lods(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn movs(comp: &mut CPU, instruction: Instruction) -> usize {
     let src_loc = comp.regs.get(&Regs::SI).unwrap().value;
     let dst_loc = comp.regs.get(&Regs::DI).unwrap().value;
@@ -119,11 +117,14 @@ pub fn movs(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn stos(comp: &mut CPU, instruction: Instruction) -> usize {
     let size = instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
     let dst = DstArg::RegPtr(Regs::DI, size);
-    let src = DstArg::Reg(Regs::AX).to_src_arg(comp).unwrap();
+    let src = match size {
+        Size::Word => DstArg::Reg(Regs::AX),
+        Size::Byte => DstArg::Reg8(0),
+        Size::DWord => panic!("stos can only get byte or word")
+    }.to_src_arg(comp).unwrap();
 
     comp.write_to_arg(dst, src).unwrap();
 

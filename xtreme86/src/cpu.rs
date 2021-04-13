@@ -908,6 +908,18 @@ impl CPU {
         self.instruction = tmp_instruction;
     }
 
+
+    fn do_opcode(&mut self, opcode: u8) {
+        let instruction = InstructionDecoder::new(self.opcodes.clone(), self.ram.as_slice()).decode(opcode).unwrap();
+
+        let tmp_instruction = self.instruction.clone();
+        self.instruction.replace(instruction.clone());
+
+        self.next_cycles += instruction.exec(self);
+
+        self.instruction = tmp_instruction;
+    }
+
     fn check_carry_add(&mut self, arg: SrcArg) {
         match arg {
             SrcArg::Word(src) => {

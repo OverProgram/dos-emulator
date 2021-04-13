@@ -112,6 +112,10 @@ impl<'a> InstructionDecoder<'a> {
     pub fn get(mut self) -> Option<Instruction>{
         let code = self.read_ip();
         self.code = code;
+        self.decode(code)
+    }
+
+    pub fn decode(&mut self, code: u8) -> Option<Instruction> {
         let opcode_data = self.get_opcode(code)?;
 
         self.instruction.flags = opcode_data.flags;
@@ -135,7 +139,7 @@ impl<'a> InstructionDecoder<'a> {
 
         self.instruction.length = self.ip;
 
-        Some(self.instruction)
+        Some(self.instruction.clone())
     }
 
     fn get_opcode(&self, code: u8) -> Option<Opcode> {
