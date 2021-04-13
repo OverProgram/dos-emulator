@@ -86,6 +86,17 @@ mod mov_test {
         assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x0000);
         assert_eq!(comp.read_reg(Regs::DS).unwrap(), 0xFFFF);
     }
+
+    #[test]
+    fn test_ex() {
+        let mut comp = new_cpu_from_file("obj/ex.out");
+        comp.write_bytes_ds(0x0A, vec![0xFF]).unwrap();
+        comp.run_to_nop(0);
+        assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x20);
+        assert_eq!(comp.read_reg(Regs::DX).unwrap(), 0x10);
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0xFF);
+    }
 }
 
 mod test_alu {

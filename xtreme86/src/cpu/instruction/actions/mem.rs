@@ -21,7 +21,6 @@ pub fn cwd(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn ldw(comp: &mut CPU, instruction: Instruction, seg: Regs) -> usize {
     let value = match instruction.src.clone().unwrap().to_src_arg(comp) {
         Some(SrcArg::DWord(val)) => val,
@@ -46,7 +45,6 @@ pub fn lds(comp: &mut CPU, instruction: Instruction) -> usize {
     ldw(comp, instruction, Regs::DS)
 }
 
-//TODO: Test
 pub fn xchg(comp: &mut CPU, instruction: Instruction) -> usize {
     let dst = instruction.dst.as_ref().unwrap();
     let src = instruction.src.as_ref().unwrap();
@@ -59,12 +57,11 @@ pub fn xchg(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn xlat(comp: &mut CPU, _: Instruction) -> usize {
     let al = comp.regs.get(&Regs::AX).unwrap().get_low() as u16;
     let src = DstArg::RegPtrImm(Regs::BX, al, Size::Byte).to_src_arg(comp).unwrap();
 
-    comp.write_to_arg(DstArg::Reg8(4), src).unwrap();
+    comp.write_to_arg(DstArg::Reg8(0), src).unwrap();
 
     0
 }
