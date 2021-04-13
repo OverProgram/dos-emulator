@@ -137,7 +137,6 @@ pub fn sahf(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn rep(comp: &mut CPU, instruction: Instruction) -> usize {
     let cmp;
     let op = match instruction.dst.as_ref().unwrap() {
@@ -175,7 +174,6 @@ pub fn rep_mnemonic(instruction: Instruction) -> String {
     }.to_string()
 }
 
-//TODO: Test
 pub fn repne(comp: &mut CPU, instruction: Instruction) -> usize {
     let op = match instruction.dst.as_ref().unwrap() {
         DstArg::Opcode(opcode) => match opcode {
