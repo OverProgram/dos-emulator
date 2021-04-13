@@ -237,6 +237,9 @@ mod stack_test {
         computer.run_to_nop(0);
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x16);
         assert_eq!(computer.read_reg(Regs::SP).unwrap(), 0xFFFF);
+
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::SP).unwrap(), 0xFFFF);
     }
 }
 
