@@ -18,7 +18,6 @@ pub fn jmp(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn jmp_far(comp: &mut CPU, instruction: Instruction) -> usize {
     let tmp_dst = instruction.dst.unwrap();
     let comp_dst = if let DstArg::Imm16(val) = tmp_dst {
