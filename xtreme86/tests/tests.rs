@@ -363,7 +363,7 @@ mod test_string {
         assert_eq!(comp.probe_mem_word(address_es_new as usize), 0x706F);
 
         comp.run_to_nop_from_ip();
-        assert_eq!(comp.read_reg(Regs::SI).unwrap(), 8);
-        assert_eq!(comp.read_reg(Regs::DI).unwrap(), 8);
+        assert_eq!(comp.read_reg(Regs::SI).unwrap(), 10);
+        assert_eq!(comp.read_reg(Regs::DI).unwrap(), 10);
     }
 }
