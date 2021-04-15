@@ -62,50 +62,12 @@ pub struct Opcode {
     pub shorthand1: Option<Placeholder>,
     pub shorthand2: Option<Placeholder>,
     pub flags: BitFlags<OpcodeFlags>,
-    pub segment: Regs,
+    pub segment: Option<Regs>,
     pub action: OpcodeAction,
     pub mnemonic: Mnemonic
 }
 
 impl Opcode {
-    // fn new(num_args: NumArgs, action: OpcodeAction) -> Self {
-    //     Self {
-    //         num_args,
-    //         action,
-    //         flags: BitFlags::EMPTY,
-    //         shorthand1: None,
-    //         shorthand2: None,
-    //         segment: Regs::DS,
-    //         mnemonic: Mnemonic::Static(String::from(""))
-    //     }
-    // }
-
-    // fn set_flags(mut self, flags: BitFlags<OpcodeFlags>) -> Self {
-    //     self.flags = flags;
-    //     self
-    // }
-    //
-    // fn set_seg(mut self, segment: Regs) -> Self {
-    //     self.segment = segment;
-    //     self
-    // }
-    //
-    // fn set_placeholders(mut self, shorthand1: Option<Placeholder>, shorthand2: Option<Placeholder>) -> Self {
-    //     self.shorthand1 = shorthand1;
-    //     self.shorthand2 = shorthand2;
-    //     self
-    // }
-    //
-    // fn set_mnemonic_func(mut self, mnemonic: MnemonicFunc) -> Self {
-    //     self.mnemonic = Mnemonic::Dynamic(mnemonic);
-    //     self
-    // }
-    //
-    // fn set_mnemonic_str(mut self, mnemonic: &str) -> Self {
-    //     self.mnemonic = Mnemonic::Static(String::from(mnemonic));
-    //     self
-    // }
-
     pub fn has_shorthand(&self) -> bool {
         if let Some(_) = self.shorthand1 {
             true

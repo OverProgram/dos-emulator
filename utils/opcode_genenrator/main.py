@@ -11,9 +11,9 @@ class Function:
 
 
 class Opcode:
-    SEG_DS = "DS"
-    SEG_ES = "ES"
-    SEG_CS = "CS"
+    SEG_DS = "Regs::DS"
+    SEG_ES = "Regs::ES"
+    SEG_CS = "Regs::CS"
 
     NUM_ARGS_ZERO = "NumArgs::Zero"
     NUM_ARGS_ONE = "NumArgs::One"
@@ -27,7 +27,7 @@ class Opcode:
     FLAG_FORCE_DWORD = "ForceDWord"
     FLAG_FORCE_DIRECTION = "ForceDirection"
 
-    def __init__(self, num_args, action, mnemonic, shorthand1=None, shorthand2=None, flags=(), segment=SEG_DS):
+    def __init__(self, num_args, action, mnemonic, shorthand1=None, shorthand2=None, flags=(), segment=None):
         self.num_args = num_args
         self.action = action
         self.mnemonic = mnemonic
@@ -68,12 +68,18 @@ class Opcode:
         flags += " })"
         return flags
 
+    def get_seg(self):
+        if self.segment is not None:
+            return "Some({})".format(self.segment)
+        else:
+            return "None"
+
     def __str__(self):
         return \
             "Some(Opcode{{ num_args: {!s}, action: {!s}, mnemonic: {!s}, shorthand1: {!s}," \
-            " shorthand2: {!s}, flags: {!s}, segment: Regs::{!s} }})" \
+            " shorthand2: {!s}, flags: {!s}, segment: {!s} }})" \
             .format(self.num_args, self.action, self.get_mnemonic(), self.get_shorthand1(), self.get_shorthand2(),
-                    self.get_flags(), self.segment)
+                    self.get_flags(), self.get_seg())
 
 
 def condition_to_opcode(func, mnemonic, prefix):
