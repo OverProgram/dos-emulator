@@ -230,6 +230,32 @@ mod test_alu {
         computer.run_to_nop_from_ip();
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x0014);
     }
+
+    #[test]
+    fn test_shift() {
+        let mut comp = new_cpu_from_file("obj/shift.out");
+
+        comp.run_to_nop(0);
+        assert_eq!(comp.read_reg(Regs::CX).unwrap(), 0x7FFF);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::CX).unwrap(), 0xFFFE);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::DX).unwrap(), 0xFF00);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::DX).unwrap(), 0xFE00);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::BX).unwrap(), 0x00F0);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::BX).unwrap(), 0x000F);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.read_reg(Regs::SI).unwrap(), 0x8003);
+    }
 }
 
 mod stack_test {

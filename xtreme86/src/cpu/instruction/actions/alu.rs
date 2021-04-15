@@ -72,8 +72,9 @@ fn rotate_left_carry_byte(arg: u8, times: u8, carry: u8) -> (u8, u8) {
     let mut num = arg;
     let mut new_carry = carry;
     for _ in 0..times {
-        new_carry = num >> 7;
-        num = (num << 1) | new_carry;
+        let tmp_carry = new_carry;
+        new_carry = (num & 0x01) as u8;
+        num = (num << 1) | (tmp_carry << 7);
     }
     (num, new_carry)
 }
@@ -82,8 +83,9 @@ fn rotate_left_carry_word(arg: u16, times: u16, carry: u8) -> (u16, u8) {
     let mut num = arg;
     let mut new_carry = carry;
     for _ in 0..times {
-        new_carry = (num >> 15) as u8;
-        num = (num << 1) | (new_carry as u16);
+        let tmp_carry = new_carry;
+        new_carry = (num & 0x01) as u8;
+        num = (num << 1) | ((tmp_carry as u16) << 15);
     }
     (num, new_carry)
 }
@@ -92,8 +94,9 @@ fn rotate_right_carry_byte(arg: u8, times: u8, carry: u8) -> (u8, u8) {
     let mut num = arg;
     let mut new_carry = carry;
     for _ in 0..times {
-        new_carry = num & 0x01;
-        num = (num >> 1) | (new_carry << 7);
+        let tmp_carry = new_carry;
+        new_carry = (num & 0x01) as u8;
+        num = (num >> 1) | (tmp_carry << 7);
     }
     (num, new_carry)
 }
@@ -102,8 +105,9 @@ fn rotate_right_carry_word(arg: u16, times: u16, carry: u8) -> (u16, u8) {
     let mut num = arg;
     let mut new_carry = carry;
     for _ in 0..times {
+        let tmp_carry = new_carry;
         new_carry = (num & 0x01) as u8;
-        num = (num >> 1) | ((new_carry as u16) << 15);
+        num = (num >> 1) | ((tmp_carry as u16) << 15);
     }
     (num, new_carry)
 }
@@ -505,14 +509,12 @@ pub fn daa(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn ror(comp: &mut CPU, instruction: Instruction) -> usize {
     let res = comp.operation_2_args(|src, dst| rotate_right_byte(dst, src), |src, dst| rotate_right_word(dst, src));
     comp.write_to_arg(*instruction.dst.as_ref().unwrap(), res).unwrap();
     0
 }
 
-//TODO: Test
 pub fn rol(comp: &mut CPU, instruction: Instruction) -> usize {
     let res = comp.operation_2_args(|src, dst| rotate_left_byte(dst, src), |src, dst| rotate_left_word(dst, src));
     comp.write_to_arg(*instruction.dst.as_ref().unwrap(), res).unwrap();
@@ -527,7 +529,6 @@ fn get_times(src: SrcArg) -> u8 {
    }
 }
 
-//TODO: Test
 pub fn rcr(comp: &mut CPU, instruction: Instruction) -> usize {
     let carry = if comp.check_flag(CPUFlags::CARRY) { 1 } else { 0 };
     let times = get_times(instruction.src.as_ref().unwrap().to_src_arg(comp).unwrap());
@@ -558,7 +559,6 @@ pub fn rcr(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn rcl(comp: &mut CPU, instruction: Instruction) -> usize {
     let carry = if comp.check_flag(CPUFlags::CARRY) { 1 } else { 0 };
     let times = get_times(instruction.src.as_ref().unwrap().to_src_arg(comp).unwrap());
@@ -609,13 +609,12 @@ fn shift_check_carry(comp: &mut CPU, instruction: &Instruction, times: u8, left:
     }
 }
 fn shift_get_times(comp: &mut CPU, instruction: &Instruction) -> u8 {
-    match instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap() {
+    match instruction.src.as_ref().unwrap().to_src_arg(comp).unwrap() {
         SrcArg::Byte(val) => val,
         _ => panic!("shift operation is only allowed byte as src arg")
     }
 }
 
-//TODO: Test
 pub fn sal(comp: &mut CPU, instruction: Instruction) -> usize {
     let times = match instruction.src.unwrap().to_src_arg(comp).unwrap() {
         SrcArg::Byte(times) => if times == 1 {
@@ -642,7 +641,6 @@ pub fn sal(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-//TODO: Test
 pub fn shr(comp: &mut CPU, instruction: Instruction) -> usize {
     comp.set_flag(CPUFlags::OVERFLOW);
 
@@ -656,27 +654,14 @@ pub fn shr(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-fn arithmetic_right_shift_word(arg: u16, times: u16) -> u16 {
-    let sign_bit = arg & 0x8000;
-    let mut res = arg;
-    for _ in 0..times {
-        res >>= 1;
-        res |= sign_bit;
-    }
-    res
+fn arithmetic_right_shift_word(times: u16, arg: u16) -> u16 {
+    ((arg & (0x7FFF)) >> times) | (arg & 0x8000)
 }
 
-fn arithmetic_right_shift_byte(arg: u8, times: u8) -> u8 {
-    let sign_bit = arg & 0x80;
-    let mut res = arg;
-    for _ in 0..times {
-        res >>= 1;
-        res |= sign_bit;
-    }
-    res
+fn arithmetic_right_shift_byte(times: u8, arg: u8) -> u8 {
+    ((arg & (0x7F)) >> times) | (arg & 0x80)
 }
 
-//TODO: Test
 pub fn sar(comp: &mut CPU, instruction: Instruction) -> usize {
     if CPU::check_src_arg(&instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap(),
                           |dst| dst & 0x80 != 0, |dst| dst & 0x8000 != 0) {

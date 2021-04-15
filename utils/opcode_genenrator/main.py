@@ -142,7 +142,7 @@ def make_opcodes():
                      Function('alu_dispatch_one_arg_mnemonic', 'alu')),
         0xF6: Opcode(Opcode.NUM_ARGS_ONE, Function('mul_dispatch', 'alu'), Function('mul_dispatch_mnemonic', 'alu')),
         0xC0: Opcode(Opcode.NUM_ARGS_TWO, Function('rotate_dispatch', 'alu'),
-                     Function('rotate_dispatch_mnemonic', 'alu'), shorthand2='Imm',
+                     Function('rotate_dispatch_mnemonic', 'alu'),
                      flags=(Opcode.FLAG_IMMEDIATE, Opcode.FLAG_FORCE_BYTE, Opcode.FLAG_SIZE_MISMATCH)),
         0xD0: Opcode(Opcode.NUM_ARGS_TWO, Function('rotate_dispatch', 'alu'),
                      Function('rotate_dispatch_mnemonic', 'alu'), shorthand2='Byte(1)',

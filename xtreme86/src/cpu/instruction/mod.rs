@@ -221,7 +221,7 @@ impl<'a> InstructionDecoder<'a> {
 
     fn get_args(&mut self) {
         match self.opcode_data.clone().unwrap().num_args {
-            NumArgs::Two => if !self.opcode_data.as_ref().unwrap().has_shorthand() { self.get_two_args() },
+            NumArgs::Two => self.get_two_args(),
             NumArgs::One => if let None = self.instruction.dst { self.get_one_arg() },
             NumArgs::Zero => ()
         }
@@ -237,10 +237,8 @@ impl<'a> InstructionDecoder<'a> {
 
         let arg2 = if force_dword {
             Some(DstArg::Reg16(reg_bits))
-        } else if let None = self.instruction.src {
-            Some(self.translate_mod_rm(mod_bits, rm_bits))
         } else {
-            None
+            Some(self.translate_mod_rm(mod_bits, rm_bits))
         };
 
         let arg1 = if immediate {
