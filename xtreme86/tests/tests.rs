@@ -41,6 +41,7 @@ mod mov_test {
     use super::cpu;
     use crate::new_cpu_from_file;
     use crate::cpu::Regs;
+    use xtreme86::cpu::CPU;
 
     #[test]
     fn test_mov_reg_shorthand() {
@@ -67,6 +68,17 @@ mod mov_test {
         computer.load(code, 0);
         computer.execute_next_from(1);
         assert_eq!(computer.probe_mem(0), 0x55);
+    }
+
+    #[test]
+    fn test_seg_override() {
+        let mut comp = new_cpu_from_file("obj/seg.out");
+
+        comp.run_to_nop(0);
+        assert_eq!(comp.probe_mem_es(0), 0x05);
+
+        comp.run_to_nop_from_ip();
+        assert_eq!(comp.probe_mem_word(CPU::physical_address(comp.read_reg(Regs::SS).unwrap(), 0x06) as usize), 0xFFFF);
     }
 
     #[test]

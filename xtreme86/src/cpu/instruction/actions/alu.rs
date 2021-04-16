@@ -509,6 +509,8 @@ pub fn daa(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
+// TODO: AAM and DAS
+
 pub fn ror(comp: &mut CPU, instruction: Instruction) -> usize {
     let res = comp.operation_2_args(|src, dst| rotate_right_byte(dst, src), |src, dst| rotate_right_word(dst, src));
     comp.write_to_arg(*instruction.dst.as_ref().unwrap(), res).unwrap();

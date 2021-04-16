@@ -1067,6 +1067,22 @@ impl CPU {
         (self.ram[loc] as u16) | ((self.ram[loc + 1] as u16) << 8)
     }
 
+    pub fn probe_mem_ds(&self, loc: u16) -> u8 {
+        self.probe_mem(Self::physical_address(self.regs.get(&Regs::DS).unwrap().value, loc) as usize)
+    }
+
+    pub fn probe_mem_es(&self, loc: u16) -> u8 {
+        self.probe_mem(Self::physical_address(self.regs.get(&Regs::ES).unwrap().value, loc) as usize)
+    }
+
+    pub fn probe_mem_ds_word(&self, loc: u16) -> u16 {
+        self.probe_mem_word(Self::physical_address(self.regs.get(&Regs::DS).unwrap().value, loc) as usize)
+    }
+
+    pub fn probe_mem_es_word(&self, loc: u16) -> u16 {
+        self.probe_mem_word(Self::physical_address(self.regs.get(&Regs::ES).unwrap().value, loc) as usize)
+    }
+
     pub fn write_bytes(&mut self, start_loc: usize, bytes: Vec<u8>) -> Result<(), String> {
         for (i, byte) in bytes.iter().enumerate() {
             *self.ram.get_mut(start_loc + i).map_or(Err("Index out of bounds"), |s| Ok(s))? = *byte;

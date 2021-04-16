@@ -120,35 +120,36 @@ impl<'a> InstructionDecoder<'a> {
         let seg;
         match code {
             0x26 => {
-                seg = Regs::ES;
                 let op = self.read_ip();
                 opcode_data = self.get_opcode(op)?;
+                seg = Some(Regs::ES);
             },
             0x2E => {
-                seg = Regs::CS;
                 let op = self.read_ip();
                 opcode_data = self.get_opcode(op)?;
+                seg = Some(Regs::CS);
             },
             0x36 => {
-                seg = Regs::SS;
                 let op = self.read_ip();
                 opcode_data = self.get_opcode(op)?;
+                seg = Some(Regs::SS);
             },
             0x3E => {
-                seg = Regs::DS;
                 let op = self.read_ip();
                 opcode_data = self.get_opcode(op)?;
+                seg = Some(Regs::DS);
             },
             _ => {
                 opcode_data = self.get_opcode(code)?;
-                seg = opcode_data.segment.unwrap_or(Regs::DS);
+                seg = None;
             }
         }
 
         self.instruction.flags = opcode_data.flags;
         self.instruction.action = Some(opcode_data.action.clone());
-        self.instruction.segment = seg;
         self.instruction.mnemonic = Some(opcode_data.mnemonic.clone());
+
+        let opcode_segment = opcode_data.segment;
 
         self.opcode_data.replace(opcode_data);
 
@@ -166,7 +167,29 @@ impl<'a> InstructionDecoder<'a> {
 
         self.instruction.length = self.ip;
 
+        self.instruction.segment = seg.unwrap_or_else(|| {
+            if self.check_ss() {
+                Regs::SS
+            } else {
+                opcode_segment.unwrap_or(Regs::DS)
+            }
+        });
+
         Some(self.instruction.clone())
+    }
+
+    fn check_ss(&self) -> bool {
+        Self::check_is_bp(self.instruction.src) || Self::check_is_bp(self.instruction.dst)
+    }
+
+    fn check_is_bp(arg: Option<DstArg>) -> bool {
+        match arg {
+            Some(DstArg::RegPtr(reg, _)) => if let Regs::BP = reg { true } else { false }
+            Some(DstArg::RegPtrImm(reg, _, _)) => if let Regs::BP = reg { true } else { false }
+            Some(DstArg::RegPtrOff(reg1, reg2, _)) => if let Regs::BP = reg1 { true } else if let Regs::BP = reg2 { true } else { false }
+            Some(DstArg::RegPtrOffImm(reg1, reg2, _, _)) => if let Regs::BP = reg1 { true } else if let Regs::BP = reg2 { true } else { false }
+            _ => false
+        }
     }
 
     fn get_opcode(&self, code: u8) -> Option<Opcode> {
