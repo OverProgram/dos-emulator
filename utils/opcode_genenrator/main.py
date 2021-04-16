@@ -244,7 +244,11 @@ def make_opcodes():
         0xE4: Opcode(Opcode.NUM_ARGS_TWO, Function('in_action', 'io'), 'in', shorthand1='Reg(0)', shorthand2='Imm',
                      flags=(Opcode.FLAG_IMMEDIATE, Opcode.FLAG_FORCE_BYTE)),
         0xEC: Opcode(Opcode.NUM_ARGS_TWO, Function('in_action', 'io'), 'in', shorthand1='Reg(0)',
-                     shorthand2='RegEnum(Regs::DX)')
+                     shorthand2='RegEnum(Regs::DX)'),
+        0xE6: Opcode(Opcode.NUM_ARGS_TWO, Function('out', 'io'), 'out', shorthand1='Imm', shorthand2='Reg(0)',
+                     flags=(Opcode.FLAG_IMMEDIATE, Opcode.FLAG_FORCE_BYTE)),
+        0xEE: Opcode(Opcode.NUM_ARGS_TWO, Function('out', 'io'), 'out', shorthand1='RegEnum(Regs::DX)',
+                     shorthand2='Reg(0)'),
     }
 
     for i in range(8):

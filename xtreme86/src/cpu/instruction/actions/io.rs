@@ -19,5 +19,15 @@ pub fn in_action(comp: &mut CPU, instruction: Instruction) -> usize {
 }
 
 pub fn out(comp: &mut CPU, instruction: Instruction) -> usize {
+    let dst = instruction.dst.unwrap().to_src_arg(comp).unwrap();
+    let val = instruction.src.unwrap().to_src_arg(comp).unwrap();
+    let address = match dst {
+        SrcArg::Byte(address) => address as u16,
+        SrcArg::Word(address) => address,
+        _ => panic!("in can only get a byte port address")
+    };
+
+    comp.write_io_mem(address, val);
+
     0
 }
