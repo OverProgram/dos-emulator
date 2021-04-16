@@ -27,6 +27,16 @@ pub fn int(comp: &mut CPU) -> usize {
 
     let new_cs = comp.read_mem_word_seg((num as u16) * 4 + 2, Regs::ES).unwrap();
     let new_ip = comp.read_mem_word_seg((num as u16) * 4, Regs::ES).unwrap();
+
+    if new_cs == 0xFFFF {
+        let dev_opt = comp.io_devices.get_mut(new_ip as usize).map(|s| s.clone());
+        let new_cycles = match dev_opt {
+            Some(mut dev) => dev.handle_interrupt(comp, num),
+            None => 0
+        };
+        comp.next_cycles += new_cycles;
+    }
+
     comp.write_to_arg(DstArg::Reg(Regs::CS), SrcArg::Word(new_cs)).unwrap();
     comp.write_to_arg(DstArg::Reg(Regs::IP), SrcArg::Word(new_ip)).unwrap();
 

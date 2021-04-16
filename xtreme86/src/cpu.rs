@@ -5,8 +5,9 @@ use std::collections::HashMap;
 use std::fmt::{Debug};
 use crate::cpu::instruction::actions::{int, alu};
 use crate::cpu::instruction::{InstructionDecoder};
-use crate::cpu::instruction::args::{SrcArg, DstArg};
+use crate::cpu::instruction::args::{SrcArg, DstArg, Size};
 use crate::cpu::instruction::opcode::OpcodeFlags;
+use crate::peripheral::Peripheral;
 
 // #[bitflags`]
 // #[derive(Copy, Clone, Debug, PartialEq)]
@@ -219,7 +220,6 @@ enum WordPart {
 //     }
 // }
 
-#[derive(Debug)]
 pub struct CPU {
     ram: Vec<u8>,
     regs: HashMap<Regs, reg::Reg>,
@@ -228,7 +228,8 @@ pub struct CPU {
     next_cycles: usize,
     irq: Option<u8>,
     opcode_address: (u16, u16),
-    src_ptr: Option<u16>,
+    io_devices: Vec<Box<dyn Peripheral>>,
+    io_memory_hooks: Vec<usize>,
 }
 
 impl CPU {
@@ -351,7 +352,8 @@ impl CPU {
             next_cycles: 0,
             irq: None,
             opcode_address: (0, 0),
-            src_ptr: None
+            io_devices: Vec::new(),
+            io_memory_hooks: Vec::new(),
         }
     }
 
@@ -361,7 +363,6 @@ impl CPU {
         } else if let Some(opcode) = self.instruction.clone() {
             opcode.exec(self);
             self.instruction = None;
-            self.src_ptr = None
         } else if let Some(_) = self.irq {
             self.next_cycles += int::int(self);
         } else {
@@ -671,6 +672,26 @@ impl CPU {
 
     fn read_mem_word_seg(&mut self, ptr: u16, seg: Regs) -> Option<u16> {
         Some((self.read_mem_byte_seg(ptr, seg)? as u16) | ((self.read_mem_byte_seg(ptr + 1, seg)? as u16) << 8))
+    }
+
+    fn read_io_mem(&mut self, address: u32, size: Size) -> SrcArg {
+        let dev_index = self.io_memory_hooks[address as usize];
+        let dev = self.io_devices.get_mut(dev_index).unwrap();
+        match size {
+            Size::Byte => SrcArg::Byte(dev.handle_mem_read_byte(address)),
+            Size::Word => SrcArg::Word(dev.handle_mem_read_word(address)),
+            _ => panic!("can only read byte or word from io memory")
+        }
+    }
+
+    fn write_io_mem(&mut self, address: u32, val: SrcArg) {
+        let dev_index = self.io_memory_hooks[address as usize];
+        let dev = self.io_devices.get_mut(dev_index).unwrap();
+        match val {
+            SrcArg::Byte(byte) => dev.handle_mem_write_byte(address, byte),
+            SrcArg::Word(word) => dev.handle_mem_write_word(address, word),
+            _ => panic!("can only write byte or word from io memory")
+        }
     }
 
     // fn write_mem_byte_seg(&mut self, ptr: u16, seg: Regs, val: u8) -> Result<(), &str> {
@@ -1051,6 +1072,16 @@ impl CPU {
     //         DstArg::Reg8(reg)
     //     }
     // }
+
+    pub fn hook_peripheral(&mut self, dev: Box<dyn Peripheral>) {
+        let index = self.io_devices.len();
+        dev.init(self, index);
+        self.io_devices.push(dev);
+    }
+
+    pub fn hook_io_memory(&mut self, dev_index: usize) {
+        self.io_memory_hooks.push(dev_index);
+    }
 
     pub fn read_reg(&self, reg: Regs) -> Option<u16> {
         match self.regs.get(&reg) {
