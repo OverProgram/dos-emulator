@@ -2,6 +2,7 @@ use crate::cpu::CPU;
 use crate::cpu::instruction::Instruction;
 use crate::cpu::instruction::args::SrcArg;
 
+// TODO: test
 pub fn in_action(comp: &mut CPU, instruction: Instruction) -> usize {
     let src = instruction.src.unwrap().to_src_arg(comp).unwrap();
     let size = instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
@@ -18,6 +19,7 @@ pub fn in_action(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
+// TODO: test
 pub fn out(comp: &mut CPU, instruction: Instruction) -> usize {
     let dst = instruction.dst.unwrap().to_src_arg(comp).unwrap();
     let val = instruction.src.unwrap().to_src_arg(comp).unwrap();
