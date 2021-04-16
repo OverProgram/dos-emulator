@@ -674,7 +674,7 @@ impl CPU {
         Some((self.read_mem_byte_seg(ptr, seg)? as u16) | ((self.read_mem_byte_seg(ptr + 1, seg)? as u16) << 8))
     }
 
-    fn read_io_mem(&mut self, address: u32, size: Size) -> SrcArg {
+    fn read_io_mem(&mut self, address: u16, size: Size) -> SrcArg {
         let dev_index = self.io_memory_hooks[address as usize];
         let dev = self.io_devices.get_mut(dev_index).unwrap();
         match size {
@@ -684,7 +684,7 @@ impl CPU {
         }
     }
 
-    fn write_io_mem(&mut self, address: u32, val: SrcArg) {
+    fn write_io_mem(&mut self, address: u16, val: SrcArg) {
         let dev_index = self.io_memory_hooks[address as usize];
         let dev = self.io_devices.get_mut(dev_index).unwrap();
         match val {

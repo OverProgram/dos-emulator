@@ -2,7 +2,7 @@
 
 use crate::cpu::instruction::opcode::{Opcode, Mnemonic, NumArgs, Placeholder};
 use crate::cpu::{Regs, CPU, CPUFlags};
-use crate::cpu::instruction::actions::{alu, flags, int, jmp, mem, stack};
+use crate::cpu::instruction::actions::{alu, flags, int, io, jmp, mem, stack};
 use enumflags2::make_bitflags;
 use crate::cpu::instruction::opcode::OpcodeFlags;
 use std::rc::Rc;
@@ -238,7 +238,7 @@ impl Opcode {
 			Some(Opcode{ num_args: NumArgs::One, action: jmp::lop(Box::new(|this: &CPU| this.check_flag(CPUFlags::ZERO))), mnemonic: Mnemonic::Static(String::from("loope")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ Immediate | SizeMismatch }), segment: Some(Regs::CS) }),
 			Some(Opcode{ num_args: NumArgs::One, action: jmp::lop(Box::new(|_: &CPU| true)), mnemonic: Mnemonic::Static(String::from("loop")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ Immediate | SizeMismatch }), segment: Some(Regs::CS) }),
 			Some(Opcode{ num_args: NumArgs::One, action: jmp::cond_jmp(Box::new(|this: &CPU| this.regs.get(&Regs::CX).unwrap().value == 0)), mnemonic: Mnemonic::Static(String::from("jcxz")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ Immediate | SizeMismatch }), segment: Some(Regs::CS) }),
-			None,
+			Some(Opcode{ num_args: NumArgs::Two, action: Rc::new(io::in_action), mnemonic: Mnemonic::Static(String::from("in")), shorthand1: Some(Placeholder::Reg(0)), shorthand2: Some(Placeholder::Imm), flags: make_bitflags!(OpcodeFlags::{ Immediate | ForceByte }), segment: None }),
 			None,
 			None,
 			None,
@@ -246,7 +246,7 @@ impl Opcode {
 			Some(Opcode{ num_args: NumArgs::One, action: Rc::new(jmp::jmp), mnemonic: Mnemonic::Static(String::from("jmp")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ Immediate | ForceWord }), segment: None }),
 			Some(Opcode{ num_args: NumArgs::One, action: Rc::new(jmp::jmp_far), mnemonic: Mnemonic::Static(String::from("jmp")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ Immediate | ForceDWord }), segment: None }),
 			Some(Opcode{ num_args: NumArgs::One, action: Rc::new(jmp::jmp), mnemonic: Mnemonic::Static(String::from("jmp")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ Immediate | ForceByte }), segment: None }),
-			None,
+			Some(Opcode{ num_args: NumArgs::Two, action: Rc::new(io::in_action), mnemonic: Mnemonic::Static(String::from("in")), shorthand1: Some(Placeholder::Reg(0)), shorthand2: Some(Placeholder::RegEnum(Regs::DX)), flags: make_bitflags!(OpcodeFlags::{  }), segment: None }),
 			None,
 			None,
 			None,

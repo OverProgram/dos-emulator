@@ -4,3 +4,4 @@ pub mod int;
 pub mod jmp;
 pub mod mem;
 pub mod stack;
+pub mod io;

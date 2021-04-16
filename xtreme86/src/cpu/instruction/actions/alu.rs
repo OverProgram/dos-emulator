@@ -509,7 +509,6 @@ pub fn daa(comp: &mut CPU, _: Instruction) -> usize {
     0
 }
 
-// TODO: AAM and DAS
 pub fn aam(comp: &mut CPU, instruction: Instruction) -> usize {
     let al = comp.regs.get(&Regs::AX).unwrap().get_low();
     let ax = comp.regs.get_mut(&Regs::AX).unwrap();
