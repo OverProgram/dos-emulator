@@ -510,6 +510,47 @@ pub fn daa(comp: &mut CPU, _: Instruction) -> usize {
 }
 
 // TODO: AAM and DAS
+pub fn aam(comp: &mut CPU, instruction: Instruction) -> usize {
+    let al = comp.regs.get(&Regs::AX).unwrap().get_low();
+    let ax = comp.regs.get_mut(&Regs::AX).unwrap();
+    let base = match instruction.dst {
+        Some(DstArg::Imm8(val)) => val,
+        _ => panic!("AAM can only get a byte immediate value")
+    };
+
+    ax.set_high(al / base);
+    ax.set_low(al % base);
+
+    0
+}
+
+pub fn das(comp: &mut CPU, _: Instruction) -> usize {
+    let old_al = comp.regs.get(&Regs::AX).unwrap().get_low();
+    let old_cf = comp.check_flag(CPUFlags::CARRY);
+
+    comp.clear_flag(CPUFlags::CARRY);
+
+    if (old_al & 0x0F) > 9 || comp.check_flag(CPUFlags::AUX_CARRY) {
+        let (new_al, new_cf) = old_al.overflowing_sub(6);
+        comp.regs.get_mut(&Regs::AX).unwrap().set_low(new_al);
+        if new_cf || old_cf {
+            comp.set_flag(CPUFlags::CARRY);
+        } else {
+            comp.clear_flag(CPUFlags::CARRY);
+        }
+        comp.set_flag(CPUFlags::AUX_CARRY);
+    } else {
+        comp.clear_flag(CPUFlags::AUX_CARRY);
+    }
+
+    if old_al > 0x99 || old_cf {
+        let new_al = comp.regs.get(&Regs::AX).unwrap().get_low() - 0x60;
+        comp.regs.get_mut(&Regs::AX).unwrap().set_low(new_al);
+        comp.set_flag(CPUFlags::CARRY);
+    }
+
+    0
+}
 
 pub fn ror(comp: &mut CPU, instruction: Instruction) -> usize {
     let res = comp.operation_2_args(|src, dst| rotate_right_byte(dst, src), |src, dst| rotate_right_word(dst, src));

@@ -241,6 +241,12 @@ mod test_alu {
 
         computer.run_to_nop_from_ip();
         assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x0014);
+
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x1508);
+
+        computer.run_to_nop_from_ip();
+        assert_eq!(computer.read_reg(Regs::AX).unwrap(), 0x0088);
     }
 
     #[test]

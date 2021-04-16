@@ -43,3 +43,11 @@ CPU 286
     add al, bl
     daa
     nop
+
+    mov al, 0xDA
+    aam
+    nop
+
+    mov ax, 0x00EE
+    das
+    nop
