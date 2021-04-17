@@ -26,7 +26,7 @@ pub fn out(comp: &mut CPU, instruction: Instruction) -> usize {
     let address = match dst {
         SrcArg::Byte(address) => address as u16,
         SrcArg::Word(address) => address,
-        _ => panic!("in can only get a byte port address")
+        _ => panic!("out can only get a byte port address")
     };
 
     comp.write_io_mem(address, val);
