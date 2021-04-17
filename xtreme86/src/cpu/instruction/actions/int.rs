@@ -19,6 +19,8 @@ fn get_int_num(comp: &mut CPU, instruction: Instruction) -> u8 {
 pub fn int(comp: &mut CPU) -> usize {
     let tmp_es = comp.read_reg(Regs::ES).unwrap();
 
+    comp.set_reg(Regs::ES, 0x0000);
+
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::FLAGS)), 0b110);
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::CS)), 0b110);
     comp.sub_command(0xFF, None, Some(DstArg::Reg(Regs::IP)), 0b110);

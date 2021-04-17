@@ -107,7 +107,7 @@ impl Regs {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum WordPart {
+pub enum WordPart {
     Low,
     High
 }
@@ -265,7 +265,7 @@ impl CPU {
     }
 
     fn read_io_mem(&mut self, address: u16, size: Size) -> SrcArg {
-        let dev_index = self.io_memory_hooks[address as usize];
+        let dev_index = self.io_memory_hooks[&address];
         let dev = self.io_devices.get_mut(dev_index).unwrap();
         match size {
             Size::Byte => SrcArg::Byte(dev.handle_mem_read_byte(address)),
@@ -275,7 +275,7 @@ impl CPU {
     }
 
     fn write_io_mem(&mut self, address: u16, val: SrcArg) {
-        let dev_index = self.io_memory_hooks[address as usize];
+        let dev_index = self.io_memory_hooks[&address];
         let dev = self.io_devices.get_mut(dev_index).unwrap();
         match val {
             SrcArg::Byte(byte) => dev.handle_mem_write_byte(address, byte),
@@ -540,13 +540,34 @@ impl CPU {
     }
 
     pub fn hook_io_memory(&mut self, dev_index: usize, address: u16) {
-        self.io_memory_hooks[address] = dev_index;
+        self.io_memory_hooks.insert(address, dev_index);
+    }
+
+    pub fn hook_interrupt(&mut self, dev_index: usize, int_num: u8) {
+        self.write_mem_word((int_num as u16) * 4 + 2, 0xFFFF).unwrap();
+        self.write_mem_word((int_num as u16) * 4, dev_index as u16).unwrap();
     }
 
     pub fn read_reg(&self, reg: Regs) -> Option<u16> {
         match self.regs.get(&reg) {
             Some(val) => Some(val.value),
             None => None
+        }
+    }
+
+    pub fn read_reg_part(&self, reg: Regs, part: WordPart) -> u8 {
+        let tmp = &self.regs[&reg];
+        match part {
+            WordPart::High => tmp.get_high(),
+            WordPart::Low => tmp.get_low()
+        }
+    }
+
+    pub fn set_reg_part(&mut self, reg: Regs, part: WordPart, val: u8) {
+        let tmp = self.regs.get_mut(&reg).unwrap();
+        match part {
+            WordPart::High => tmp.set_high(val),
+            WordPart::Low => tmp.set_low(val)
         }
     }
 
