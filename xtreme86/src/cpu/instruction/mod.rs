@@ -182,7 +182,7 @@ impl<'a> InstructionDecoder<'a> {
         Self::check_is_bp(self.instruction.src) || Self::check_is_bp(self.instruction.dst)
     }
 
-    fn check_is_bp(arg: Option<DstArg>) -> bool {
+    pub fn check_is_bp(arg: Option<DstArg>) -> bool {
         match arg {
             Some(DstArg::RegPtr(reg, _)) => if let Regs::BP = reg { true } else { false }
             Some(DstArg::RegPtrImm(reg, _, _)) => if let Regs::BP = reg { true } else { false }

@@ -15,7 +15,6 @@ fn get_int_num(comp: &mut CPU, instruction: Instruction) -> u8 {
     }.unwrap()
 }
 
-// TODO: test peripheral interrupt
 pub fn int(comp: &mut CPU) -> usize {
     let tmp_es = comp.read_reg(Regs::ES).unwrap();
 

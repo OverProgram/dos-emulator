@@ -1,8 +1,8 @@
-use crate::cpu::CPU;
+use crate::cpu::{CPU, Regs};
 use crate::cpu::instruction::Instruction;
-use crate::cpu::instruction::args::SrcArg;
+use crate::cpu::instruction::args::{SrcArg, DstArg};
+use crate::cpu::instruction::actions::flags::{advance_di, advance_si};
 
-// TODO: test
 pub fn in_action(comp: &mut CPU, instruction: Instruction) -> usize {
     let src = instruction.src.unwrap().to_src_arg(comp).unwrap();
     let size = instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
@@ -19,7 +19,18 @@ pub fn in_action(comp: &mut CPU, instruction: Instruction) -> usize {
     0
 }
 
-// TODO: test
+pub fn ins(comp: &mut CPU, instruction: Instruction) -> usize {
+    comp.instruction.as_mut().map(|s| s.segment = Regs::ES);
+
+    let size = instruction.dst.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
+
+    comp.sub_command(0xEC, instruction.src, Some(DstArg::RegPtr(Regs::DI, size)), 0);
+
+    advance_di(comp, size);
+
+    0
+}
+
 pub fn out(comp: &mut CPU, instruction: Instruction) -> usize {
     let dst = instruction.dst.unwrap().to_src_arg(comp).unwrap();
     let val = instruction.src.unwrap().to_src_arg(comp).unwrap();
@@ -30,6 +41,18 @@ pub fn out(comp: &mut CPU, instruction: Instruction) -> usize {
     };
 
     comp.write_io_mem(address, val);
+
+    0
+}
+
+pub fn outs(comp: &mut CPU, instruction: Instruction) -> usize {
+    comp.instruction.as_mut().map(|s| s.segment = Regs::DS);
+
+    let size = instruction.src.as_ref().unwrap().to_src_arg(comp).unwrap().get_size();
+
+    comp.sub_command(0xEE, Some(DstArg::RegPtr(Regs::SI, size)), instruction.dst, 0);
+
+    advance_si(comp, size);
 
     0
 }

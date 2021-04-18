@@ -247,10 +247,22 @@ def make_opcodes():
         0xEC: Opcode(Opcode.NUM_ARGS_TWO, Function('in_action', 'io'), 'in', shorthand1='Reg(0)',
                      shorthand2='RegEnum(Regs::DX)',
                      flags=(Opcode.FLAG_SIZE_MISMATCH, Opcode.FLAG_FORCE_NOT_DIRECTION)),
+        0x6C: Opcode(Opcode.NUM_ARGS_ZERO, Function('ins', 'io'), 'insb', shorthand1='Byte(0)',
+                     shorthand2='RegEnum(Regs::DX)',
+                     flags=(Opcode.FLAG_SIZE_MISMATCH, Opcode.FLAG_FORCE_NOT_DIRECTION), segment=Opcode.SEG_ES),
+        0x6D: Opcode(Opcode.NUM_ARGS_ZERO, Function('ins', 'io'), 'insw', shorthand1='Word(0)',
+                     shorthand2='RegEnum(Regs::DX)',
+                     flags=(Opcode.FLAG_SIZE_MISMATCH, Opcode.FLAG_FORCE_NOT_DIRECTION), segment=Opcode.SEG_ES),
         0xE6: Opcode(Opcode.NUM_ARGS_TWO, Function('out', 'io'), 'out', shorthand1='Imm', shorthand2='Reg(0)',
                      flags=(Opcode.FLAG_IMMEDIATE, Opcode.FLAG_FORCE_BYTE)),
         0xEE: Opcode(Opcode.NUM_ARGS_TWO, Function('out', 'io'), 'out', shorthand1='RegEnum(Regs::DX)',
                      shorthand2='Reg(0)', flags=(Opcode.FLAG_SIZE_MISMATCH, Opcode.FLAG_FORCE_NOT_DIRECTION)),
+        0x6E: Opcode(Opcode.NUM_ARGS_TWO, Function('outs', 'io'), 'outsb', shorthand1='RegEnum(Regs::DX)',
+                     shorthand2='Byte(0)', flags=(Opcode.FLAG_SIZE_MISMATCH, Opcode.FLAG_FORCE_NOT_DIRECTION),
+                     segment=Opcode.SEG_DS),
+        0x6F: Opcode(Opcode.NUM_ARGS_TWO, Function('outs', 'io'), 'outsw', shorthand1='RegEnum(Regs::DX)',
+                     shorthand2='Word(0)', flags=(Opcode.FLAG_SIZE_MISMATCH, Opcode.FLAG_FORCE_NOT_DIRECTION),
+                     segment=Opcode.SEG_DS),
     }
 
     for i in range(8):

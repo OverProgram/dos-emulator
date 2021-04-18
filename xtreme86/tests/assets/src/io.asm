@@ -15,3 +15,13 @@ CPU 286
     out dx, al
     in ax, dx
     nop
+
+    mov dx, 0x0098
+    mov cx, 10
+    xor si, si
+    rep outsb
+
+    mov cx, 10
+    mov di, 0
+    rep insb
+    nop

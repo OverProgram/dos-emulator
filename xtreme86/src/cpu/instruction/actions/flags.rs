@@ -156,7 +156,7 @@ pub fn rep(comp: &mut CPU, instruction: Instruction) -> usize {
     loop {
         comp.do_opcode(op);
         comp.regs.get_mut(&Regs::CX).unwrap().value -= 1;
-        if comp.regs.get(&Regs::CX).unwrap().value != 0 && if cmp { !comp.check_flag(CPUFlags::ZERO) } else { true } {
+        if comp.regs.get(&Regs::CX).unwrap().value == 0 || if cmp { !comp.check_flag(CPUFlags::ZERO) } else { false } {
             break;
         }
     }

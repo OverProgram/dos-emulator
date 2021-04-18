@@ -65,6 +65,42 @@ impl Peripheral for TestDevice {
     }
 }
 
+#[derive(Clone)]
+struct StringDevice {
+    string: Vec<u8>,
+    loc: usize
+}
+
+impl Peripheral for StringDevice {
+    fn init(&self, comp: &mut CPU, index: usize) {
+        comp.hook_io_memory(index, 0x0098);
+    }
+
+    fn handle_interrupt(&mut self, _: &mut CPU, _: u8) -> usize { 0 }
+
+    fn handle_mem_read_byte(&mut self, address: u16) -> u8 {
+        if address == 0x0098 {
+            self.string[{
+                let tmp = self.loc;
+                self.loc += 1;
+                tmp
+            }]
+        } else {
+            0
+        }
+    }
+
+    fn handle_mem_read_word(&mut self, _: u16) -> u16 { 0 }
+
+    fn handle_mem_write_byte(&mut self, address: u16, val: u8) {
+        if address == 0x0098 {
+            self.string.push(val);
+        }
+    }
+
+    fn handle_mem_write_word(&mut self, _: u16, _: u16) {}
+}
+
 fn load_binary(filename: &str) -> Vec<u8> {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
@@ -101,10 +137,23 @@ impl TestDevice {
     }
 }
 
+impl StringDevice {
+    fn new() -> Self {
+        StringDevice {
+            string: Vec::new(),
+            loc: 0
+        }
+    }
+}
+
 #[test]
 fn test_in_out() {
     let mut comp = new_cpu_from_file("obj/io.out");
     comp.hook_peripheral(Box::new(TestDevice::new()));
+    comp.hook_peripheral(Box::new(StringDevice::new()));
+
+    let string = "Hello, asm".to_string().into_bytes();
+    comp.write_bytes_ds(0, string.clone()).unwrap();
 
     comp.run_to_nop(0);
     assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x1234);
@@ -114,4 +163,9 @@ fn test_in_out() {
 
     comp.run_to_nop_from_ip();
     assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x5678);
+
+    comp.run_to_nop_from_ip();
+    for i in 0..10 {
+        assert_eq!(comp.probe_mem_es(i), string[i as usize]);
+    }
 }

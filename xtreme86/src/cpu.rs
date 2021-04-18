@@ -392,10 +392,18 @@ impl CPU {
         let instruction = {
             let mut tmp = instruction::Instruction::new();
 
-            tmp.action = Some(InstructionDecoder::get_opcode_from_slice(&self.opcodes, opcode).unwrap().action);
+            let data = InstructionDecoder::get_opcode_from_slice(&self.opcodes, opcode).unwrap();
+            tmp.action = Some(data.action);
             tmp.src = src;
             tmp.dst = dst;
             tmp.reg_bits = reg_bits;
+            tmp.segment = data.segment.unwrap_or(self.instruction.as_ref().map_or_else(||
+                if InstructionDecoder::check_is_bp(src) || InstructionDecoder::check_is_bp(dst) {
+                    Regs::SS
+                } else {
+                    Regs::DS
+                }
+            , |s| s.segment));
 
             tmp
         };
