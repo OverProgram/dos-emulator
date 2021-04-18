@@ -1,5 +1,5 @@
 use xtreme86::peripheral::Peripheral;
-use xtreme86::cpu::{CPU};
+use xtreme86::cpu::{CPU, Regs, WordPart};
 use xtreme86::cpu;
 use std::fs::File;
 use std::fs;
@@ -21,7 +21,7 @@ impl Peripheral for TestDevice {
     }
 
     fn handle_interrupt(&mut self,  _: &mut CPU, int_num: u8) -> usize {
-        if int_num == 12 {
+        if int_num == 0x12 {
             let new_part = !self.part;
             self.part = new_part;
         }
@@ -92,7 +92,26 @@ fn new_cpu_from_file(filename: &str) -> cpu::CPU {
     computer
 }
 
+impl TestDevice {
+    fn new() -> Self {
+        TestDevice {
+            val: 0,
+            part: false
+        }
+    }
+}
+
 #[test]
 fn test_in_out() {
+    let mut comp = new_cpu_from_file("obj/io.out");
+    comp.hook_peripheral(Box::new(TestDevice::new()));
 
+    comp.run_to_nop(0);
+    assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x1234);
+
+    comp.run_to_nop_from_ip();
+    assert_eq!(comp.read_reg_part(Regs::AX, WordPart::Low), 0x56);
+
+    comp.run_to_nop_from_ip();
+    assert_eq!(comp.read_reg(Regs::AX).unwrap(), 0x5678);
 }

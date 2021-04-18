@@ -240,8 +240,9 @@ impl<'a> InstructionDecoder<'a> {
 
                 let one_arg = if let opcode::NumArgs::Two = self.opcode_data.clone().unwrap().num_args { false } else { true };
 
-                if (self.d == 1 && !self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::Immediate) && !one_arg) ||
-                    self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceDirection) {
+                if !self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceNotDirection)
+                    && ((self.d == 1 && !self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::Immediate) && !one_arg) ||
+                    self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceDirection)) {
                     self.instruction.src = arg1_translated;
                     self.instruction.dst = arg2_translated;
                 } else {
@@ -398,11 +399,12 @@ impl<'a> InstructionDecoder<'a> {
                 DstArg::Reg(reg)
             }
             opcode::Placeholder::Imm => {
-                if self.s == 1 {
-                    DstArg::Imm16(self.read_ip_word())
-                } else {
-                    DstArg::Imm8(self.read_ip())
-                }
+                // if self.s == 1 {
+                //     DstArg::Imm16(self.read_ip_word())
+                // } else {
+                //     DstArg::Imm8(self.read_ip())
+                // }
+                self.get_imm()
             }
             opcode::Placeholder::Reg8(reg) => DstArg::Reg8(reg),
             opcode::Placeholder::Reg16(reg) => DstArg::Reg16(reg),

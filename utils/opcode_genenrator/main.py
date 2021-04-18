@@ -26,6 +26,7 @@ class Opcode:
     FLAG_FORCE_BYTE = "ForceByte"
     FLAG_FORCE_DWORD = "ForceDWord"
     FLAG_FORCE_DIRECTION = "ForceDirection"
+    FLAG_FORCE_NOT_DIRECTION = "ForceNotDirection"
 
     def __init__(self, num_args, action, mnemonic, shorthand1=None, shorthand2=None, flags=(), segment=None):
         self.num_args = num_args
@@ -244,11 +245,12 @@ def make_opcodes():
         0xE4: Opcode(Opcode.NUM_ARGS_TWO, Function('in_action', 'io'), 'in', shorthand1='Reg(0)', shorthand2='Imm',
                      flags=(Opcode.FLAG_IMMEDIATE, Opcode.FLAG_FORCE_BYTE)),
         0xEC: Opcode(Opcode.NUM_ARGS_TWO, Function('in_action', 'io'), 'in', shorthand1='Reg(0)',
-                     shorthand2='RegEnum(Regs::DX)'),
+                     shorthand2='RegEnum(Regs::DX)',
+                     flags=(Opcode.FLAG_SIZE_MISMATCH, Opcode.FLAG_FORCE_NOT_DIRECTION)),
         0xE6: Opcode(Opcode.NUM_ARGS_TWO, Function('out', 'io'), 'out', shorthand1='Imm', shorthand2='Reg(0)',
                      flags=(Opcode.FLAG_IMMEDIATE, Opcode.FLAG_FORCE_BYTE)),
         0xEE: Opcode(Opcode.NUM_ARGS_TWO, Function('out', 'io'), 'out', shorthand1='RegEnum(Regs::DX)',
-                     shorthand2='Reg(0)'),
+                     shorthand2='Reg(0)', flags=(Opcode.FLAG_SIZE_MISMATCH, Opcode.FLAG_FORCE_NOT_DIRECTION)),
     }
 
     for i in range(8):

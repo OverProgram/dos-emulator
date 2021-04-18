@@ -15,6 +15,7 @@ pub enum OpcodeFlags {
     ForceByte = 0x0010,
     ForceDWord = 0x0020,
     ForceDirection = 0x0040,
+    ForceNotDirection = 0x0080,
 }
 
 #[derive(Clone, Copy, Debug)]

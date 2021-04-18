@@ -533,10 +533,15 @@ impl CPU {
         }
     }
 
-    pub fn hook_peripheral(&mut self, dev: Box<dyn Peripheral>) {
+    pub fn get_peripheral(&self, dev_index: usize) -> Option<&Box<dyn Peripheral>> {
+        self.io_devices.get(dev_index)
+    }
+
+    pub fn hook_peripheral(&mut self, dev: Box<dyn Peripheral>) -> usize {
         let index = self.io_devices.len();
         dev.init(self, index);
         self.io_devices.push(dev);
+        index
     }
 
     pub fn hook_io_memory(&mut self, dev_index: usize, address: u16) {
@@ -544,8 +549,8 @@ impl CPU {
     }
 
     pub fn hook_interrupt(&mut self, dev_index: usize, int_num: u8) {
-        self.write_mem_word((int_num as u16) * 4 + 2, 0xFFFF).unwrap();
-        self.write_mem_word((int_num as u16) * 4, dev_index as u16).unwrap();
+        self.write_word((int_num as usize) * 4 + 2, 0xFFFF).unwrap();
+        self.write_word((int_num as usize) * 4, dev_index as u16).unwrap();
     }
 
     pub fn read_reg(&self, reg: Regs) -> Option<u16> {
@@ -610,6 +615,10 @@ impl CPU {
     pub fn write_bytes_es(&mut self, start_loc: u16, bytes: Vec<u8>) -> Result<(), String> {
         let es = self.regs.get(&Regs::ES).unwrap().value;
         self.write_bytes(Self::physical_address(es, start_loc) as usize, bytes)
+    }
+
+    pub fn write_word(&mut self, loc: usize, word: u16) -> Result<(), String> {
+        self.write_bytes(loc, vec![(word & 0xFF) as u8, (word >> 8) as u8])
     }
 
     pub fn load(&mut self, data: Vec<u8>, loc: usize) {

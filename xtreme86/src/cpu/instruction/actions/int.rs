@@ -34,14 +34,18 @@ pub fn int(comp: &mut CPU) -> usize {
     if new_cs == 0xFFFF {
         let dev_opt = comp.io_devices.get_mut(new_ip as usize).map(|s| s.clone());
         let new_cycles = match dev_opt {
-            Some(mut dev) => dev.handle_interrupt(comp, num),
+            Some(mut dev) => {
+                let tmp = dev.handle_interrupt(comp, num);
+                comp.io_devices[new_ip as usize] = dev;
+                tmp
+            }
             None => 0
         };
         comp.next_cycles += new_cycles;
+    } else {
+        comp.write_to_arg(DstArg::Reg(Regs::CS), SrcArg::Word(new_cs)).unwrap();
+        comp.write_to_arg(DstArg::Reg(Regs::IP), SrcArg::Word(new_ip)).unwrap();
     }
-
-    comp.write_to_arg(DstArg::Reg(Regs::CS), SrcArg::Word(new_cs)).unwrap();
-    comp.write_to_arg(DstArg::Reg(Regs::IP), SrcArg::Word(new_ip)).unwrap();
 
     comp.set_reg(Regs::ES, tmp_es);
     0
