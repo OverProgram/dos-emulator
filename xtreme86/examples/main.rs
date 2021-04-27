@@ -55,7 +55,7 @@ fn main() {
     load_file(Path::new("examples/print.out"), &mut comp);
     comp.hook_peripheral(Box::new(Printer));
 
-    let string = "Hello, world!\0";
+    let string = "Hello, world\0";
     comp.write_bytes(CPU::physical_address(0x4000, 0) as usize, Vec::from(string)).unwrap();
 
     comp.run_to_nop_from_ip();
