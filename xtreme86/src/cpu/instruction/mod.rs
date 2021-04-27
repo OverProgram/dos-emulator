@@ -115,27 +115,31 @@ impl<'a> InstructionDecoder<'a> {
         self.decode(code)
     }
 
-    pub fn decode(&mut self, code: u8) -> Option<Instruction> {
+    pub fn decode(&mut self, mut code: u8) -> Option<Instruction> {
         let opcode_data;
         let seg;
         match code {
             0x26 => {
                 let op = self.read_ip();
+                code = op;
                 opcode_data = self.get_opcode(op)?;
                 seg = Some(Regs::ES);
             },
             0x2E => {
                 let op = self.read_ip();
+                code = op;
                 opcode_data = self.get_opcode(op)?;
                 seg = Some(Regs::CS);
             },
             0x36 => {
                 let op = self.read_ip();
+                code = op;
                 opcode_data = self.get_opcode(op)?;
                 seg = Some(Regs::SS);
             },
             0x3E => {
                 let op = self.read_ip();
+                code = op;
                 opcode_data = self.get_opcode(op)?;
                 seg = Some(Regs::DS);
             },
@@ -154,7 +158,13 @@ impl<'a> InstructionDecoder<'a> {
         self.opcode_data.replace(opcode_data);
 
         self.d = (code & 0x02) >> 1;
-        self.s = if self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceDWord) { 2 } else { code & 0x01 };
+        self.s = if self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceDWord) {
+            2
+        } else if self.opcode_data.as_ref().unwrap().flags.contains(OpcodeFlags::ForceWord) {
+            1
+        } else {
+            code & 0x01
+        };
 
         self.translate_placeholder();
 
@@ -281,6 +291,7 @@ impl<'a> InstructionDecoder<'a> {
     fn get_two_args(&mut self) {
         let immediate = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::Immediate);
         let force_dword = self.opcode_data.clone().unwrap().flags.contains(opcode::OpcodeFlags::ForceDWord);
+        let segment = self.opcode_data.as_ref().unwrap().flags.contains(OpcodeFlags::Segment);
 
         let mod_reg_rm = self.read_ip();
         let (mod_bits, reg_bits, rm_bits) = Self::get_mod_reg_rm_bits(mod_reg_rm);
@@ -296,6 +307,8 @@ impl<'a> InstructionDecoder<'a> {
             self.get_imm()
         } else if force_dword {
             DstArg::Ptr(self.read_ip_word(), Size::DWord)
+        } else if segment {
+            DstArg::reg_to_seg_arg(reg_bits).unwrap()
         } else {
             DstArg::reg_to_arg(reg_bits, self.s)
         };

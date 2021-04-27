@@ -150,7 +150,7 @@ impl Opcode {
 			None,
 			None,
 			None,
-			None,
+			Some(Opcode{ num_args: NumArgs::Two, action: Rc::new(mem::mov), mnemonic: Mnemonic::Static(String::from("mov")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ ForceWord | Segment }), segment: None }),
 			Some(Opcode{ num_args: NumArgs::Two, action: Rc::new(mem::lea), mnemonic: Mnemonic::Static(String::from("lea")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{ ForceDirection }), segment: None }),
 			None,
 			Some(Opcode{ num_args: NumArgs::One, action: Rc::new(stack::pop), mnemonic: Mnemonic::Static(String::from("pop")), shorthand1: None, shorthand2: None, flags: make_bitflags!(OpcodeFlags::{  }), segment: None }),

@@ -71,6 +71,16 @@ impl DstArg {
         }
     }
 
+    pub fn reg_to_seg_arg(reg: u8) -> Option<Self> {
+        Some(Self::Reg(match reg {
+            0 => Regs::ES,
+            1 => Regs::CS,
+            2 => Regs::SS,
+            3 => Regs::CS,
+            _ => return None
+        }))
+    }
+
     pub fn to_src_arg(self, comp: &mut CPU) -> Option<SrcArg> {
         match self {
             DstArg::Reg8(reg) => Some(SrcArg::Byte(comp.get_reg_8(reg)?)),

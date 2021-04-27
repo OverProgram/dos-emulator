@@ -27,6 +27,7 @@ class Opcode:
     FLAG_FORCE_DWORD = "ForceDWord"
     FLAG_FORCE_DIRECTION = "ForceDirection"
     FLAG_FORCE_NOT_DIRECTION = "ForceNotDirection"
+    FLAG_SEGMENT = "Segment"
 
     def __init__(self, num_args, action, mnemonic, shorthand1=None, shorthand2=None, flags=(), segment=None):
         self.num_args = num_args
@@ -125,6 +126,8 @@ def make_opcodes():
         0x88: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov'),
         0xA0: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov', 'Reg(0)', 'Ptr'),
         0xC6: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov', flags=(Opcode.FLAG_IMMEDIATE,)),
+        0x8C: Opcode(Opcode.NUM_ARGS_TWO, Function('mov', 'mem'), 'mov',
+                     flags=(Opcode.FLAG_FORCE_WORD, Opcode.FLAG_SEGMENT)),
         0x86: Opcode(Opcode.NUM_ARGS_TWO, Function('xchg', 'mem'), 'xchg'),
         0xD7: Opcode(Opcode.NUM_ARGS_ZERO, Function('xlat', 'mem'), 'xlat'),
         0xC5: Opcode(Opcode.NUM_ARGS_TWO, Function('lds', 'mem'), 'lds', flags=(Opcode.FLAG_FORCE_DWORD,)),

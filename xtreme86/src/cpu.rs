@@ -171,9 +171,14 @@ impl CPU {
             let opcode_address =  (self.regs[&Regs::CS].value, self.regs[&Regs::IP].value);
             self.opcode_address = opcode_address;
             let physical_address = Self::physical_address(opcode_address.0, opcode_address.1) as usize;
-            self.instruction.replace(instruction::InstructionDecoder::new(self.opcodes.clone(), &self.ram[physical_address..]).get().unwrap());
-            self.next_cycles += self.instruction.clone().unwrap().next_cycles;
-            self.regs.get_mut(&Regs::IP).unwrap().value += self.instruction.clone().unwrap().length as u16;
+            if let Some(ins) = instruction::InstructionDecoder::new(self.opcodes.clone(), &self.ram[physical_address..]).get() {
+                self.instruction.replace(ins);
+                self.next_cycles += self.instruction.clone().unwrap().next_cycles;
+                self.regs.get_mut(&Regs::IP).unwrap().value += self.instruction.clone().unwrap().length as u16;
+            } else {
+                self.except(exceptions::INVALID_OPCODE).unwrap();
+                self.regs.get_mut(&Regs::IP).unwrap().value += 1;
+            }
         }
     }
 
